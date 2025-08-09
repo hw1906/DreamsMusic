@@ -16,6 +16,13 @@ from handlers import (
 )
 from utils import logger_util, language_util, maintenance_util
 
+
+# maintenance command
+@app.on_message(filters.command(["maintenance"]) & filters.user(AUTH_USERS))
+async def maintenance_cmd(client, message):
+    await maintenance_util.maintenance_toggle(client, message)
+
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
