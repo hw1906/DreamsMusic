@@ -25,3 +25,8 @@ DEFAULT_LANG = os.getenv("DEFAULT_LANG", "en")
 MAINTENANCE_MODE = False
 
 PLAYBACK_CONTROL = os.getenv("PLAYBACK_CONTROL", "admins")
+
+# config.py or constants.py
+
+STATS_IMAGE_URL = "https://i.imgur.com/YourStatsImage.png"
+
