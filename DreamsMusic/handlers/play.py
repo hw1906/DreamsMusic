@@ -1,5 +1,6 @@
 # handlers/play.py
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+from utils import maintenance_util
 from utils import yt_utils
 from core import player
 
@@ -8,6 +9,27 @@ import asyncio
 
 # Global dictionary to store playing messages for editing seekbar later
 playing_messages = {}
+
+
+MAINTENANCE_IMAGE_URL = "https://i.imgur.com/ZzqV1XY.png"  # Replace with your maintenance image URL
+
+async def play(client, message: Message, lang, pytgcalls, assistant):
+    if maintenance_util.is_maintenance():
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🛠 Support Group", url="https://t.me/CloseFriendsCommunity"),
+                InlineKeyboardButton("📢 Update Channel", url="https://t.me/CFCBots")
+            ]
+        ])
+        await message.reply_photo(
+            photo=MAINTENANCE_IMAGE_URL,
+            caption="**Maintenance mode is enabled please check support group.**",
+            reply_markup=buttons,
+            parse_mode="markdown"
+        )
+        return
+
+    # Your existing play logic here (search + play)
 
 async def play(client, message: Message, lang, pytgcalls, assistant):
     query = " ".join(message.text.split()[1:])
