@@ -3,6 +3,7 @@ import platform
 import sys
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from config import STATS_IMAGE_URL
 
 import importlib.metadata
 
