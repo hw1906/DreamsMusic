@@ -1,6 +1,7 @@
 # main.py
 # Main entry: runs both bot and assistant user (string session) clients and PyTgCalls
 
+import handlers.stats
 import logging
 from pyrogram import Client, filters
 from pytgcalls import PyTgCalls
