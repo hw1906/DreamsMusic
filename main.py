@@ -4,7 +4,7 @@
 import logging
 import asyncio
 
-from pyrogram import Client, filters
+from pyrogram import Client, filters, idle
 from pyrogram.types import CallbackQuery
 
 from pytgcalls import PyTgCalls
@@ -18,6 +18,7 @@ from handlers import (
     auth_handler,
     broadcast_handler,
     extra_handler,
+    playlist,  # Added playlist handler import
 )
 from utils import logger_util, language_util, maintenance_util
 
@@ -94,13 +95,46 @@ async def logger_cmd(client, message):
 
 @app.on_message(filters.command(["maintenance"]) & filters.user(AUTH_USERS))
 async def maintenance_cmd2(client, message):
-    # This was duplicated - you can remove or keep if different logic needed
+    # This was duplicated - can be removed or kept if different logic needed
     await maintenance_util.maintenance_toggle(client, message)
 
 
 @app.on_message(filters.command(["logs"]) & filters.user(AUTH_USERS))
 async def logs_cmd(client, message):
     await logger_util.logger_toggle(client, message)
+
+
+# Playlist Handlers
+
+@app.on_message(filters.command("playlist") & filters.private)
+async def playlist_cmd(client, message):
+    await playlist.playlist_cmd(client, message)
+
+
+@app.on_callback_query(filters.regex(r"playlist_"))
+async def playlist_cb(client, callback_query):
+    await playlist.playlist_cb_handler(client, callback_query)
+
+
+# Add song flow handler
+@app.on_message(filters.private)
+async def handle_add_song_flow(client, message):
+    user_id = message.from_user.id
+    if hasattr(playlist, "user_adding_song") and user_id in playlist.user_adding_song and playlist.user_adding_song[user_id]:
+        text = message.text
+        if "-" not in text:
+            await message.reply("Invalid format! Send as: `Song Name - Song Link`", parse_mode="markdown")
+            return
+        song_name, song_link = map(str.strip, text.split("-", 1))
+        if not song_name or not song_link:
+            await message.reply("Both name and link are required.")
+            return
+
+        # Call playlist's function to add song (you should implement this inside playlist.py)
+        await playlist.add_song_to_playlist(user_id, song_name, song_link)
+
+        playlist.user_adding_song[user_id] = False
+        await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
 async def start_clients():
@@ -117,7 +151,7 @@ async def start_clients():
 async def main():
     await start_clients()
     logger.info("DreamsMusic is running...")
-    await asyncio.get_event_loop().create_task(idle())
+    await idle()
     await app.stop()
     await assistant.stop()
 
