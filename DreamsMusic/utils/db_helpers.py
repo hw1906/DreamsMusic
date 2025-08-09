@@ -1,8 +1,8 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-from config import MONGO_URI
+from config import MONGO_DB_URI  # Changed here
 
 # Initialize MongoDB client and database
-mongo_client = AsyncIOMotorClient(MONGO_URI)
+mongo_client = AsyncIOMotorClient(MONGO_DB_URI)
 db = mongo_client["dreamsmusicdb"]  # Change to your actual DB name
 
 # Collections
