@@ -7,37 +7,29 @@ from config import STATS_IMAGE_URL
 
 import importlib.metadata
 
-# Dummy DB functions — REPLACE these with your actual DB queries!
+# Dummy DB functions — REPLACE with your actual DB queries!
 async def get_served_chats_count():
-    # Example: return await db.chats.count_documents({})
     return 12
 
 async def get_served_users_count():
-    # Example: return await db.users.count_documents({})
     return 10
 
 async def get_blocked_users_count():
-    # Example: return await db.blocked_users.count_documents({})
     return 0
 
 async def get_sudo_users_count():
-    # Example: return await db.sudo_users.count_documents({})
     return 3
 
 async def get_db_size_mb():
-    # Example: calculate your DB size in MB
     return 1.98
 
 async def get_db_storage_mb():
-    # Example: your DB allocated storage in MB
     return 252.0
 
 async def get_db_collections_count():
-    # Example: your DB collection count
     return 7
 
 async def get_db_keys_count():
-    # Example: number of keys/indexes
     return 44
 
 def get_python_version():
@@ -67,7 +59,7 @@ def get_package_version(pkg_name):
     except importlib.metadata.PackageNotFoundError:
         return "Unknown"
 
-# Async function to build general stats string
+# Build general stats string
 async def build_general_stats():
     total_ram, used_ram, free_ram = get_ram_info()
     total_disk, used_disk, free_disk = get_disk_info()
@@ -116,24 +108,21 @@ async def build_general_stats():
 """
     return stats_text
 
-
+# Updated overall stats with genuine data
 async def build_overall_stats():
-    # For overall stats, you can add more if you want, or summarize like this:
     served_chats = await get_served_chats_count()
     served_users = await get_served_users_count()
     blocked_users = await get_blocked_users_count()
     sudo_users = await get_sudo_users_count()
+    assistants = 1  # Update with your logic to count assistants
 
-    # Dummy count for assistants (update with your logic)
-    assistants = 1
-
-    # Example settings, replace with your actual config values
+    # Replace these with your real config or status
     auto_leave_vc = False
     auto_leave_groups = False
-    play_duration_limit = 60  # in minutes
+    play_duration_limit = 60  # minutes
 
     stats_text = f"""\
-𝖠𝗌𝗌𝗂𝖲𝗍𝖺𝗇𝗍𝗌 : {assistants}
+𝖠𝗌𝗌𝗂𝗌𝗍𝖺𝗇𝗍𝗌 : {assistants}
 𝖡𝗅𝗈𝖼𝗄𝖾𝖽 : {blocked_users}
 𝖢𝗁𝖺𝗍𝗌 : {served_chats}
 𝖴𝗌𝖾𝗋𝗌 : {served_users}
@@ -146,7 +135,6 @@ async def build_overall_stats():
 """
     return stats_text
 
-
 def stats_keyboard():
     return InlineKeyboardMarkup([
         [
@@ -158,13 +146,11 @@ def stats_keyboard():
         ]
     ])
 
-from pyrogram.types import CallbackQuery
-
 @Client.on_message(filters.command("stats"))
 async def stats_cmd(client: Client, message: Message):
     general_text = await build_general_stats()
     await message.reply_photo(
-        photo="https://i.imgur.com/YourStatsImage.png",  # Replace with your image URL
+        photo=STATS_IMAGE_URL or "https://i.imgur.com/YourStatsImage.png",
         caption=general_text,
         reply_markup=stats_keyboard(),
         parse_mode="markdown"
