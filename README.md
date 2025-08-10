@@ -1,5 +1,17 @@
-# DreamsMusic  
+# DreamsMusic
+
 Delivering Superior Music Experience to Telegram.
+
+## Deploy
+
+Click any button below to deploy DreamsMusic instantly on your preferred platform:
+
+[![Deploy on Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/DreamsRobot/DreamsMusic)
+
+[![Deploy on Render](https://render.com/images/deploy-to-render-button.svg)](https://dashboard.render.com/deploy?repo=https://github.com/DreamsRobot/DreamsMusic)
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/DreamsRobot/DreamsMusic)
+
 
 ---
 
