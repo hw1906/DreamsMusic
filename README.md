@@ -2,6 +2,9 @@
 
 Delivering Superior Music Experience to Telegram.
 
+
+![Project Logo](DreamsMusic/Assist/logo.jpeg)
+
 ---
 
 **Note:**  
