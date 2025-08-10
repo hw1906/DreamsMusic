@@ -3,7 +3,6 @@
 
 import logging
 import asyncio
-import signal
 from pyrogram import Client, filters, idle
 from pyrogram.types import CallbackQuery
 from pytgcalls import PyTgCalls
@@ -38,24 +37,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Add file handler for logging
-file_handler = logging.FileHandler("bot.log")
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(file_handler)
-
-# Initialize clients
-assistant = Client(
-    "assistant",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    session_string=STRING_SESSION
-)
-
+# Initialize bot and assistant clients
 app = Client(
     "DreamsMusicBot",
     api_id=API_ID,
     api_hash=API_HASH,
-    bot_token=BOT_TOKEN
+    bot_token=BOT_TOKEN,
+)
+
+assistant = Client(
+    "assistant",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    session_string=STRING_SESSION,
 )
 
 pytgcalls = PyTgCalls(assistant)
@@ -152,90 +146,27 @@ async def handle_add_song_flow(client, message):
         await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
-async def shutdown():
-    """Properly shutdown all clients and tasks"""
-    logger.info("Initiating shutdown sequence...")
-    
-    # Cancel all running tasks except the main task
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    [task.cancel() for task in tasks]
-    
-    logger.info(f"Cancelling {len(tasks)} running tasks...")
-    try:
-        await asyncio.gather(*tasks, return_exceptions=True)
-    except Exception as e:
-        logger.error(f"Error cancelling tasks: {str(e)}")
-    
-    # Stop clients in reverse order
-    logger.info("Stopping main bot...")
-    if 'app' in globals() and app.is_initialized:
-        await app.stop()
-    
-    logger.info("Stopping PyTgCalls...")
-    if 'pytgcalls' in globals():
-        await pytgcalls.stop()
-    
-    logger.info("Stopping assistant...")
-    if 'assistant' in globals() and assistant.is_initialized:
-        await assistant.stop()
-    
-    logger.info("Shutdown complete! ✨")
-
 async def main():
     """Main execution flow"""
     logger.info("Starting DreamsMusic...")
     
     try:
-        # Start assistant first
-        logger.info("Starting assistant...")
         await assistant.start()
-        me_assistant = await assistant.get_me()
-        logger.info(f"Assistant started successfully! Name: {me_assistant.first_name}")
+        logger.info("Assistant started")
         
-        # Initialize and start PyTgCalls
-        logger.info("Starting PyTgCalls...")
         await pytgcalls.start()
-        logger.info("PyTgCalls started successfully!")
+        logger.info("PyTgCalls started")
         
-        # Wait a moment for assistant to fully connect
-        await asyncio.sleep(2)
-        
-        # Start the main bot
-        logger.info("Starting main bot...")
-        await app.start()
-        me_bot = await app.get_me()
-        logger.info(f"Bot started successfully! Name: {me_bot.first_name}")
-        
-        # Make assistant and pytgcalls available to handlers
-        app.assistant = assistant
-        app.pytgcalls = pytgcalls
-        
-        logger.info("DreamsMusic is fully operational! 🎵")
-        
-        # Handle graceful shutdown on SIGTERM/SIGINT
+        logger.info("DreamsMusic is running...")
         await idle()
         
     except Exception as e:
-        logger.error(f"Error starting bot: {str(e)}")
-        raise
+        logger.error(f"Error: {str(e)}")
     finally:
-        await shutdown()
-
-def signal_handler():
-    """Handle shutdown signals"""
-    loop = asyncio.get_event_loop()
-    loop.create_task(shutdown())
+        # Cleanup
+        if pytgcalls.is_running:
+            await pytgcalls.stop()
+        await assistant.stop()
 
 if __name__ == "__main__":
-    # Set up signal handlers
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        signal.signal(sig, lambda s, f: signal_handler())
-    
-    # Run the bot
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Received shutdown signal...")
-    except Exception as e:
-        logger.error(f"Fatal error: {str(e)}")
-        raise
+    app.run()
