@@ -26,9 +26,7 @@ languages = {
         "no_query": "कृपया गाने का नाम या लिंक दें।",
         "playing": "अभी बज रहा है: {query}",
         "welcome_message": "{name} का समूह में स्वागत है!",
-        "stats_message": "अपटाइम: {uptime}
-उपयोगकर्ता: {users}
-चैट्स: {chats}",
+        "stats_message": "अपटाइम: {uptime}\nउपयोगकर्ता: {users}\nचैट्स: {chats}"
     }
 }
 
@@ -40,9 +38,3 @@ def get_chat_language(chat_id):
     """Get chat language setting, defaults to English if not set"""
     # TODO: Implement chat language storage/retrieval
     return 'en'  # Default to English for now
-```
-    }
-}
-
-def load_language(lang_code: str):
-    return languages.get(lang_code, languages["en"])
