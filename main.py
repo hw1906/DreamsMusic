@@ -3,13 +3,8 @@
 
 import logging
 import asyncio
-import contextlib
-from typing import Optional
-from contextlib import asynccontextmanager
-
 from pyrogram import Client, filters, idle
 from pyrogram.types import CallbackQuery
-
 from pytgcalls import PyTgCalls
 
 from config import *
@@ -151,61 +146,29 @@ async def handle_add_song_flow(client, message):
         await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
-@asynccontextmanager
-async def client_session():
-    """Context manager to handle client lifecycle"""
-    try:
-        # Start clients in order
-        await app.start()
-        logger.info("Bot client started")
-        
-        await assistant.start()
-        logger.info("Assistant client started")
-        
-        await pytgcalls.start()
-        logger.info("PyTgCalls started")
-        
-        yield
-    finally:
-        # Cleanup in reverse order
-        tasks = []
-        
-        if hasattr(pytgcalls, 'is_running') and pytgcalls.is_running:
-            tasks.append(pytgcalls.stop())
-            
-        if assistant and assistant.is_connected:
-            tasks.append(assistant.stop())
-            
-        if app and app.is_connected:
-            tasks.append(app.stop())
-            
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Cancel any remaining tasks
-        for task in asyncio.all_tasks():
-            if task is not asyncio.current_task():
-                task.cancel()
-
-async def main():
-    async with client_session():
-        logger.info("DreamsMusic is running...")
-        await idle()
-
-def run():
-    """Entry point with proper event loop and exception handling"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+async def init():
+    """Initialize all clients"""
+    await app.start()
+    logger.info("Bot started")
     
-    try:
-        loop.run_until_complete(main())
-    except KeyboardInterrupt:
-        logger.info("Received shutdown signal")
-    except Exception as e:
-        logger.error(f"Runtime error: {str(e)}")
-    finally:
-        # Ensure the loop is closed
-        loop.close()
+    await assistant.start()
+    logger.info("Assistant started")
+    
+    await pytgcalls.start()
+    logger.info("PyTgCalls started")
 
 if __name__ == "__main__":
-    run()
+    loop = asyncio.get_event_loop()
+    
+    try:
+        loop.run_until_complete(init())
+        logger.info("DreamsMusic is running...")
+        idle()  # Use Pyrogram's idle synchronously
+        loop.run_until_complete(app.stop())
+        loop.run_until_complete(assistant.stop())
+        loop.run_until_complete(pytgcalls.stop())
+    except KeyboardInterrupt:
+        logger.info("Stopping bot...")
+    finally:
+        if not loop.is_closed():
+            loop.close()
