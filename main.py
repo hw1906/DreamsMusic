@@ -3,6 +3,8 @@
 
 import logging
 import asyncio
+import signal
+import sys
 
 from pyrogram import Client, filters, idle
 from pyrogram.types import CallbackQuery
