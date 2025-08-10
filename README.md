@@ -1,5 +1,7 @@
-# DreamsMusic
+# DreamsMusic  
 Delivering Superior Music Experience to Telegram.
+
+---
 
 # DreamsMusic Telegram Music Bot
 
@@ -7,38 +9,44 @@ A Telegram Music Bot with assistant user (string session) for joining voice chat
 
 ## Features
 
-- Plays music in voice chats via assistant user account (string session)
-- Play, pause, resume, stop, skip, end commands
-- Welcome messages
-- Multi-language support (English & Hindi)
-- Maintenance mode toggle
-- Logger enable/disable
-- Stats command
-- Playback control settings for admins or everyone
+- Plays music in voice chats via assistant user account (string session)  
+- Play, pause, resume, stop, skip, end commands  
+- Welcome messages  
+- Multi-language support (English & Hindi)  
+- Maintenance mode toggle  
+- Logger enable/disable  
+- Stats command  
+- Playback control settings for admins or everyone  
 
-## Setup
+---
 
-1. Clone this repo
+## VPS Setup Guide
 
-# VPS SETUP
+Follow these steps to set up and run DreamsMusic on your VPS.
+
+```bash
 sudo apt-get update && sudo apt-get upgrade -y
+
 sudo apt-get install python3-pip ffmpeg git -y
+
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
 source ~/.bashrc
 nvm install v18
+
 git clone https://github.com/DreamsRobot/DreamsMusic.git
 cd DreamsMusic
+
 python3 -m venv venv
 source venv/bin/activate
+
 pip install --upgrade pip
 pip install -r requirements.txt
+
 cp sample.env .env
+
 vi .env
+
 sudo apt install tmux -y
 tmux
-bash start
 
-# 11. Run your bot
-bash start
-# or if no start script,
-# python3 main.py
+python3 main.py
