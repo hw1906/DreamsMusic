@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: DreamsMusic
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python3 main.py
+    envVars:
+      - key: API_ID
+        fromSecret: API_ID
+      - key: API_HASH
+        fromSecret: API_HASH
+      - key: STRING_SESSION
+        fromSecret: STRING_SESSION
+      - key: BOT_TOKEN
+        fromSecret: BOT_TOKEN
+      - key: MONGO_DB_URI
+        fromSecret: MONGO_DB_URI
+      - key: OWNER_ID
+        fromSecret: OWNER_ID
