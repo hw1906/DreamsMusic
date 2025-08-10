@@ -9,9 +9,17 @@ from DreamsMusic.core import player
 playing_messages = {}
 
 MAINTENANCE_IMAGE_URL = "https://i.imgur.com/ZzqV1XY.png"  # Replace with your maintenance image URL
-LOG_CHANNEL = -1002842347858  # Replace with your actual log channel ID
+LOG_CHANNEL = -1001234567890  # Replace with your actual log channel ID
 
 async def play(client, message: Message, lang, pytgcalls, assistant):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    
+    # Check if the message is in a group
+    if message.chat.type not in ["group", "supergroup"]:
+        await message.reply("❌ This command only works in groups!")
+        return
+    
     # Maintenance mode check
     if maintenance_util.is_maintenance():
         buttons = InlineKeyboardMarkup([
@@ -34,20 +42,62 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
         await message.reply(lang.get("no_query", "Please provide a song name or link to play."))
         return
 
-    # YouTube search (yt-dlp)
+    # Send processing message
+    process_msg = await message.reply("🔍 **Searching...**")
+
     try:
+        # Search on YouTube
         video = yt_utils.yt_search(query)
+        if not video:
+            await process_msg.edit("❌ No results found!")
+            return
+
+        # Extract video information
+        title = video['title']
+        audio_url = video['url']
+        webpage_url = video['webpage_url']
+        duration = video['duration']
+        thumbnail_url = video['thumbnail']
+
+        # Create control buttons
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("⏸ Pause", callback_data=f"pause_{chat_id}"),
+                InlineKeyboardButton("⏹ Stop", callback_data=f"stop_{chat_id}"),
+                InlineKeyboardButton("⏭ Skip", callback_data=f"skip_{chat_id}")
+            ]
+        ])
+
+        # Try to join and play
+        try:
+            await assistant.join_chat(chat_id)
+            await pytgcalls.join_group_call(
+                chat_id,
+                audio_url,
+                join_as=assistant,
+                stream_type="audio"
+            )
+
+            # Get thumbnail
+            thumbnail = yt_utils.download_and_blur_thumbnail(thumbnail_url)
+            
+            # Send now playing message
+            await process_msg.edit(
+                f"🎵 **Now Playing**\n\n"
+                f"**Title:** [{title}]({webpage_url})\n"
+                f"**Duration:** {duration} seconds\n"
+                f"**Requested By:** {message.from_user.mention}",
+                reply_markup=buttons,
+                disable_web_page_preview=True
+            )
+
+        except Exception as e:
+            await process_msg.edit(f"❌ Error joining voice chat: {str(e)}")
+            return
+
     except Exception as e:
-        await message.reply(f"❌ Error finding video: {e}")
+        await process_msg.edit(f"❌ Error: {str(e)}")
         return
-
-    title = video['title']
-    audio_url = video['url']
-    webpage_url = video['webpage_url']
-    duration = video['duration']
-    thumbnail_url = video['thumbnail']
-
-    # Download and blur thumbnail (~30% blur)
     thumb_file = yt_utils.download_and_blur_thumbnail(thumbnail_url)
 
     # Play audio in voice chat (implement in your player module)
