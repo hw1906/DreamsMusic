@@ -150,48 +150,68 @@ async def handle_add_song_flow(client, message):
         await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
+# Global flag to track shutdown state
+is_shutting_down = False
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals"""
+    global is_shutting_down
+    if is_shutting_down:
+        logger.info("Force stopping...")
+        sys.exit(1)
+    is_shutting_down = True
+    logger.info("Received signal to shutdown...")
+
 async def stop_clients():
     """Stop all clients in the correct order"""
-    logger.info("Stopping clients...")
     try:
+        logger.info("Stopping PyTgCalls...")
         if hasattr(pytgcalls, 'is_running') and pytgcalls.is_running:
             await pytgcalls.stop()
-        
-        # Stop dispatcher first to prevent new handler tasks
-        if hasattr(app, 'dispatcher'):
-            app.dispatcher.stop()
-        if hasattr(assistant, 'dispatcher'):
-            assistant.dispatcher.stop()
-            
-        await asyncio.sleep(1)  # Give handlers time to complete
-        
-        # Then stop the clients
-        await app.stop()
-        await assistant.stop()
+
+        logger.info("Stopping assistant client...")
+        if assistant and assistant.is_connected:
+            await assistant.stop()
+
+        logger.info("Stopping main bot...")
+        if app and app.is_connected:
+            await app.stop()
+
     except Exception as e:
         logger.error(f"Error during client shutdown: {str(e)}")
 
-async def cleanup_tasks():
-    """Clean up any remaining tasks"""
-    try:
-        # Cancel all tasks except current
-        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-        if tasks:
-            logger.info(f"Cleaning up {len(tasks)} pending tasks...")
-            for task in tasks:
-                task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-    except Exception as e:
-        logger.error(f"Error during task cleanup: {str(e)}")
-
-async def shutdown():
+async def shutdown(signal_received=False):
     """Coordinated shutdown of all components"""
+    global is_shutting_down
+    if is_shutting_down:
+        return
+    is_shutting_down = True
+
+    logger.info("Initiating shutdown sequence...")
+    
+    # First stop all clients
     await stop_clients()
-    await cleanup_tasks()
+    
+    # Then handle any remaining tasks
+    pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    for task in pending:
+        task.cancel()
+    
+    if pending:
+        logger.info(f"Waiting for {len(pending)} tasks to complete...")
+        await asyncio.gather(*pending, return_exceptions=True)
+
+    if signal_received:
+        # Use sys.exit() for signal-triggered shutdowns
+        sys.exit(0)
 
 async def main():
+    # Set up signal handlers
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGABRT):
+        signal.signal(sig, signal_handler)
+    
     try:
-        # Initialize clients
+        # Start clients
         await app.start()
         logger.info("Bot client started.")
 
@@ -202,36 +222,23 @@ async def main():
         logger.info("PyTgCalls started on assistant client.")
 
         logger.info("DreamsMusic is running...")
-        await idle()
-
+        
+        # Keep the main task running
+        while not is_shutting_down:
+            await asyncio.sleep(1)
+            
     except Exception as e:
         logger.error(f"Error occurred: {str(e)}")
-        raise  # Re-raise to trigger shutdown
     finally:
         await shutdown()
 
-def run():
-    """Entry point with proper event loop handling"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
+if __name__ == "__main__":
     try:
-        loop.run_until_complete(main())
+        asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Received shutdown signal")
+        logger.info("Received keyboard interrupt")
     except Exception as e:
         logger.error(f"Main loop error: {str(e)}")
     finally:
-        try:
-            # Ensure shutdown runs in the same loop
-            if not loop.is_closed():
-                loop.run_until_complete(shutdown())
-                loop.run_until_complete(loop.shutdown_asyncgens())
-        except Exception as e:
-            logger.error(f"Final cleanup error: {str(e)}")
-        finally:
-            if not loop.is_closed():
-                loop.close()
-
-if __name__ == "__main__":
-    run()
+        # Ensure we're totally cleaned up
+        logger.info("Shutdown complete")
