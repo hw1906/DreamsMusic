@@ -70,7 +70,7 @@ async def admin_cmd(client, message):
     await admin_handler.handle_commands(client, message, lang)
 
 
-@app.on_message(filters.command("play") & filters.private)
+@app.on_message(filters.command("play"))
 async def play_cmd(client, message):
     await play_handler.play(client, message, lang, pytgcalls, assistant)
 
