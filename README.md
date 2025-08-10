@@ -2,6 +2,43 @@
 
 Delivering Superior Music Experience to Telegram.
 
+## Commands List
+
+| Command        | Description                                      |
+|----------------|------------------------------------------------|
+| `/start`       | Check if the bot is alive and running           |
+| `/play`        | Play a song or playlist in the voice chat       |
+| `/pause`       | Pause the currently playing music                |
+| `/resume`      | Resume paused music                              |
+| `/stop`        | Stop music playback and leave the voice chat    |
+| `/skip`        | Skip the current song and play the next in queue|
+| `/restart`     | Restart the music player or bot                   |
+| `/queue`       | Show the current music queue                      |
+| `/song`        | Get details about the currently playing song     |
+| `/seek`        | Seek to a specific position in the current song |
+| `/speed`       | Adjust playback speed (e.g., slow, normal, fast) |
+| `/loop`        | Toggle loop mode for current song or queue       |
+| `/playlist`    | Manage your saved playlists (add, delete, view)  |
+| `/stats`       | View bot usage statistics and current sessions   |
+| `/maintenance` | Enable or disable maintenance mode                |
+| `/logger`      | Enable or disable logging of bot events           |
+| `/settings`    | Adjust playback and bot behavior settings         |
+| `/language`    | Change the bot's language (English, Hindi, etc.) |
+| `/auth`        | Authorize users to control the bot                |
+| `/unauth`      | Remove user authorization                          |
+| `/authusers`   | List all authorized users                          |
+| `/broadcast`  | Send a message to all users                        |
+| `/help`        | Show this help message with commands               |
+
+---
+
+**Note:**  
+- Commands like `/play` accept URLs, song names, or playlist links.  
+- Admin commands like `/auth`, `/maintenance`, `/logger` require proper permissions.  
+- The bot supports multi-language commands, currently English and Hindi.
+
+
+
 ## Deploy
 
 Click any button below to deploy DreamsMusic instantly on your preferred platform:
