@@ -146,29 +146,47 @@ async def handle_add_song_flow(client, message):
         await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
-async def init():
-    """Initialize all clients"""
+async def start_services():
+    """Start all services"""
     await app.start()
     logger.info("Bot started")
-    
     await assistant.start()
     logger.info("Assistant started")
-    
     await pytgcalls.start()
     logger.info("PyTgCalls started")
 
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
+async def stop_services():
+    """Stop all services gracefully"""
+    try:
+        if pytgcalls.active_calls:
+            for call in pytgcalls.active_calls:
+                await call.leave_current_group()
+        await pytgcalls.stop()
+    except Exception as e:
+        logger.error(f"Error stopping PyTgCalls: {e}")
+
+    # Stop both clients
+    tasks = []
+    if app.is_connected:
+        tasks.append(app.stop())
+    if assistant.is_connected:
+        tasks.append(assistant.stop())
+    
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+async def main():
+    """Main execution flow"""
+    await start_services()
+    logger.info("DreamsMusic is running...")
     
     try:
-        loop.run_until_complete(init())
-        logger.info("DreamsMusic is running...")
-        idle()  # Use Pyrogram's idle synchronously
-        loop.run_until_complete(app.stop())
-        loop.run_until_complete(assistant.stop())
-        loop.run_until_complete(pytgcalls.stop())
+        await idle()
     except KeyboardInterrupt:
-        logger.info("Stopping bot...")
+        logger.info("Received KeyboardInterrupt...")
     finally:
-        if not loop.is_closed():
-            loop.close()
+        logger.info("Stopping services...")
+        await stop_services()
+
+if __name__ == "__main__":
+    app.run(main())
