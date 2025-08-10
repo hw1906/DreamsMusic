@@ -37,17 +37,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize bot and assistant clients
+# Add file handler for logging
+file_handler = logging.FileHandler("bot.log")
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
+
+# Initialize clients
+assistant = Client(
+    "assistant",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    session_string=STRING_SESSION
+)
+
 app = Client(
     "DreamsMusicBot",
     api_id=API_ID,
     api_hash=API_HASH,
-    bot_token=BOT_TOKEN,
+    bot_token=BOT_TOKEN
 )
-
-assistant = Client(
-    "assistant",
-    api_id=API_ID,
     api_hash=API_HASH,
     session_string=STRING_SESSION,
 )
@@ -151,18 +159,60 @@ async def main():
     logger.info("Starting DreamsMusic...")
     
     try:
+        # Start assistant first
+        logger.info("Starting assistant...")
         await assistant.start()
-        logger.info("Assistant started")
+        me_assistant = await assistant.get_me()
+        logger.info(f"Assistant started successfully! Name: {me_assistant.first_name}")
         
+        # Initialize and start PyTgCalls
+        logger.info("Starting PyTgCalls...")
         await pytgcalls.start()
-        logger.info("PyTgCalls started")
+        logger.info("PyTgCalls started successfully!")
         
-        logger.info("DreamsMusic is running...")
+        # Wait a moment for assistant to fully connect
+        await asyncio.sleep(2)
+        
+        # Start the main bot
+        logger.info("Starting main bot...")
+        await app.start()
+        me_bot = await app.get_me()
+        logger.info(f"Bot started successfully! Name: {me_bot.first_name}")
+        
+        # Make assistant and pytgcalls available to handlers
+        app.assistant = assistant
+        app.pytgcalls = pytgcalls
+        
+        logger.info("DreamsMusic is fully operational! 🎵")
         await idle()
         
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
+        logger.error(f"Error starting bot: {str(e)}")
+        raise
     finally:
+        # Cleanup
+        logger.info("Shutting down...")
+        tasks = []
+        if 'app' in locals():
+            tasks.append(app.stop())
+        if 'pytgcalls' in locals():
+            tasks.append(pytgcalls.stop())
+        if 'assistant' in locals():
+            tasks.append(assistant.stop())
+        await asyncio.gather(*tasks)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+        # Cleanup
+        logger.info("Shutting down...")
+        tasks = []
+        if 'app' in locals():
+            tasks.append(app.stop())
+        if 'pytgcalls' in locals():
+            tasks.append(pytgcalls.stop())
+        if 'assistant' in locals():
+            tasks.append(assistant.stop())
+        await asyncio.gather(*tasks)
         # Cleanup
         if pytgcalls.is_running:
             await pytgcalls.stop()
