@@ -21,7 +21,17 @@ from handlers import (
     playlist,  # Added playlist handler import
 )
 from utils import logger_util, language_util, maintenance_util
-from DreamsMusic.handlers import start, play, admin, ...
+from DreamsMusic.handlers import (
+    start,
+    play,
+    admin,
+    auth,
+    broadcast,
+    extra,
+    playlist,
+    settings,
+    stats
+)
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
