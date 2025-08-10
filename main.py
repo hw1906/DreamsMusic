@@ -3,8 +3,9 @@
 
 import logging
 import asyncio
-import signal
-import sys
+import contextlib
+from typing import Optional
+from contextlib import asynccontextmanager
 
 from pyrogram import Client, filters, idle
 from pyrogram.types import CallbackQuery
@@ -150,25 +151,11 @@ async def handle_add_song_flow(client, message):
         await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
-async def handle_shutdown():
-    """Cleanup function for graceful shutdown"""
-    logger.info("Stopping services...")
-    
+@asynccontextmanager
+async def client_session():
+    """Context manager to handle client lifecycle"""
     try:
-        # Stop PyTgCalls first
-        if hasattr(pytgcalls, 'is_running') and pytgcalls.is_running:
-            await pytgcalls.stop()
-        
-        # Stop the clients
-        await assistant.stop()
-        await app.stop()
-        
-    except Exception as e:
-        logger.error(f"Error during shutdown: {str(e)}")
-
-async def main():
-    try:
-        # Start clients
+        # Start clients in order
         await app.start()
         logger.info("Bot client started")
         
@@ -178,22 +165,47 @@ async def main():
         await pytgcalls.start()
         logger.info("PyTgCalls started")
         
+        yield
+    finally:
+        # Cleanup in reverse order
+        tasks = []
+        
+        if hasattr(pytgcalls, 'is_running') and pytgcalls.is_running:
+            tasks.append(pytgcalls.stop())
+            
+        if assistant and assistant.is_connected:
+            tasks.append(assistant.stop())
+            
+        if app and app.is_connected:
+            tasks.append(app.stop())
+            
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Cancel any remaining tasks
+        for task in asyncio.all_tasks():
+            if task is not asyncio.current_task():
+                task.cancel()
+
+async def main():
+    async with client_session():
         logger.info("DreamsMusic is running...")
-        
-        # Use Pyrogram's idle
         await idle()
-        
+
+def run():
+    """Entry point with proper event loop and exception handling"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        logger.info("Received shutdown signal")
     except Exception as e:
         logger.error(f"Runtime error: {str(e)}")
     finally:
-        await handle_shutdown()
+        # Ensure the loop is closed
+        loop.close()
 
 if __name__ == "__main__":
-    # Use uvloop if available for better performance
-    try:
-        import uvloop
-        uvloop.install()
-    except ImportError:
-        pass
-    
-    asyncio.run(main())
+    run()
