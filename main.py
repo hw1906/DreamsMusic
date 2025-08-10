@@ -10,17 +10,17 @@ from pyrogram.types import CallbackQuery
 from pytgcalls import PyTgCalls
 
 from config import *
-from handlers import (
-    start_handler,
-    admin_handler,
-    play_handler,
-    stats_handler,
-    auth_handler,
-    broadcast_handler,
-    extra_handler,
-    playlist,  # Added playlist handler import
+from DreamsMusic.handlers import (
+    start as start_handler,
+    admin as admin_handler,
+    play as play_handler,
+    stats as stats_handler,
+    auth as auth_handler,
+    broadcast as broadcast_handler,
+    extra as extra_handler,
+    playlist
 )
-from utils import logger_util, language_util, maintenance_util
+from DreamsMusic.utils import logger_util, language_util, maintenance_util
 from DreamsMusic.handlers import (
     start,
     play,
