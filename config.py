@@ -28,5 +28,5 @@ PLAYBACK_CONTROL = os.getenv("PLAYBACK_CONTROL", "admins")
 
 # config.py or constants.py
 
-STATS_IMAGE_URL = "https://i.imgur.com/YourStatsImage.png"
+STATS_IMAGE_URL = "https://graph.org/file/2255334da15aee384dcb5-c7b55af2c8cb40c4cb.jpg"
 
