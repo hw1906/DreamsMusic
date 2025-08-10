@@ -9,7 +9,7 @@ from DreamsMusic.core import player
 playing_messages = {}
 
 MAINTENANCE_IMAGE_URL = "https://i.imgur.com/ZzqV1XY.png"  # Replace with your maintenance image URL
-LOG_CHANNEL = -1001234567890  # Replace with your actual log channel ID
+LOG_CHANNEL = -1002842347858  # Replace with your actual log channel ID
 
 async def play(client, message: Message, lang, pytgcalls, assistant):
     # Maintenance mode check
