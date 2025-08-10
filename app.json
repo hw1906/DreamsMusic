@@ -1,0 +1,37 @@
+{
+  "name": "DreamsMusic",
+  "description": "Telegram Music Bot with Assistant User for Voice Chats",
+  "repository": "https://github.com/DreamsRobot/DreamsMusic",
+  "keywords": ["telegram", "music", "bot", "voicechat"],
+  "env": {
+    "API_ID": {
+      "description": "Telegram API ID",
+      "required": true
+    },
+    "API_HASH": {
+      "description": "Telegram API Hash",
+      "required": true
+    },
+    "STRING_SESSION": {
+      "description": "Assistant user String Session",
+      "required": true
+    },
+    "BOT_TOKEN": {
+      "description": "Telegram Bot Token",
+      "required": true
+    },
+    "MONGO_DB_URI": {
+      "description": "MongoDB URI for database",
+      "required": true
+    },
+    "OWNER_ID": {
+      "description": "Your Telegram User ID",
+      "required": true
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}
