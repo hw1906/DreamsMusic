@@ -146,47 +146,35 @@ async def handle_add_song_flow(client, message):
         await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
-async def start_services():
-    """Start all services"""
-    await app.start()
-    logger.info("Bot started")
-    await assistant.start()
-    logger.info("Assistant started")
-    await pytgcalls.start()
-    logger.info("PyTgCalls started")
-
-async def stop_services():
-    """Stop all services gracefully"""
-    try:
-        if pytgcalls.active_calls:
-            for call in pytgcalls.active_calls:
-                await call.leave_current_group()
-        await pytgcalls.stop()
-    except Exception as e:
-        logger.error(f"Error stopping PyTgCalls: {e}")
-
-    # Stop both clients
-    tasks = []
-    if app.is_connected:
-        tasks.append(app.stop())
-    if assistant.is_connected:
-        tasks.append(assistant.stop())
-    
-    if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
-
-async def main():
+def main():
     """Main execution flow"""
-    await start_services()
-    logger.info("DreamsMusic is running...")
+    logger.info("Starting DreamsMusic...")
     
     try:
-        await idle()
+        # Start clients
+        app.start()
+        logger.info("Bot started")
+        
+        assistant.start()
+        logger.info("Assistant started")
+        
+        pytgcalls.start()
+        logger.info("PyTgCalls started")
+        
+        logger.info("DreamsMusic is running...")
+        idle()  # Block until stopped
+        
     except KeyboardInterrupt:
         logger.info("Received KeyboardInterrupt...")
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
     finally:
-        logger.info("Stopping services...")
-        await stop_services()
+        # Cleanup
+        if pytgcalls.is_running:
+            pytgcalls.stop()
+        assistant.stop()
+        app.stop()
+        logger.info("Services stopped")
 
 if __name__ == "__main__":
-    app.run(main())
+    app.run(main)
