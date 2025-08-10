@@ -151,6 +151,35 @@ async def handle_add_song_flow(client, message):
         await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
+async def shutdown():
+    """Properly shutdown all clients and tasks"""
+    logger.info("Initiating shutdown sequence...")
+    
+    # Cancel all running tasks except the main task
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    [task.cancel() for task in tasks]
+    
+    logger.info(f"Cancelling {len(tasks)} running tasks...")
+    try:
+        await asyncio.gather(*tasks, return_exceptions=True)
+    except Exception as e:
+        logger.error(f"Error cancelling tasks: {str(e)}")
+    
+    # Stop clients in reverse order
+    logger.info("Stopping main bot...")
+    if 'app' in globals() and app.is_initialized:
+        await app.stop()
+    
+    logger.info("Stopping PyTgCalls...")
+    if 'pytgcalls' in globals():
+        await pytgcalls.stop()
+    
+    logger.info("Stopping assistant...")
+    if 'assistant' in globals() and assistant.is_initialized:
+        await assistant.stop()
+    
+    logger.info("Shutdown complete! ✨")
+
 async def main():
     """Main execution flow"""
     logger.info("Starting DreamsMusic...")
@@ -181,22 +210,15 @@ async def main():
         app.pytgcalls = pytgcalls
         
         logger.info("DreamsMusic is fully operational! 🎵")
+        
+        # Handle graceful shutdown on SIGTERM/SIGINT
         await idle()
         
     except Exception as e:
         logger.error(f"Error starting bot: {str(e)}")
         raise
     finally:
-        # Cleanup
-        logger.info("Shutting down...")
-        tasks = []
-        if 'app' in locals():
-            tasks.append(app.stop())
-        if 'pytgcalls' in locals():
-            tasks.append(pytgcalls.stop())
-        if 'assistant' in locals():
-            tasks.append(assistant.stop())
-        await asyncio.gather(*tasks)
+        await shutdown()
 
 if __name__ == "__main__":
     asyncio.run(main())
