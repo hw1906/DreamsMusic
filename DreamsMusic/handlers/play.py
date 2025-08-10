@@ -2,8 +2,8 @@
 
 import asyncio
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from utils import maintenance_util, logger_util, yt_utils
-from core import player
+from DreamsMusic.utils import maintenance_util, logger_util, yt_utils
+from DreamsMusic.core import player
 
 # Global dictionary to track control panel message IDs by chat for updating seekbar
 playing_messages = {}
