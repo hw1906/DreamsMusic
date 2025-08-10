@@ -1,6 +1,6 @@
-from utils.language_util import get_chat_language
+from DreamsMusic.utils.language_util import get_chat_language
 
-async def play(client, message, ...):
+async def settings(client, message):
     chat_id = message.chat.id
     lang = get_chat_language(chat_id)
 
