@@ -3,6 +3,7 @@
 
 import logging
 import asyncio
+import signal
 from pyrogram import Client, filters, idle
 from pyrogram.types import CallbackQuery
 from pytgcalls import PyTgCalls
@@ -220,5 +221,21 @@ async def main():
     finally:
         await shutdown()
 
+def signal_handler():
+    """Handle shutdown signals"""
+    loop = asyncio.get_event_loop()
+    loop.create_task(shutdown())
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Set up signal handlers
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, lambda s, f: signal_handler())
+    
+    # Run the bot
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Received shutdown signal...")
+    except Exception as e:
+        logger.error(f"Fatal error: {str(e)}")
+        raise
