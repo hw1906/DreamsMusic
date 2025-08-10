@@ -1,0 +1,13 @@
+build:
+  docker:
+    web: Dockerfile
+
+environments:
+  production:
+    env:
+      API_ID: YOUR_API_ID
+      API_HASH: YOUR_API_HASH
+      STRING_SESSION: YOUR_STRING_SESSION
+      BOT_TOKEN: YOUR_BOT_TOKEN
+      MONGO_DB_URI: YOUR_MONGO_URI
+      OWNER_ID: YOUR_OWNER_ID
