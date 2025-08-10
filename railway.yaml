@@ -1,0 +1,15 @@
+services:
+  - name: DreamsMusic
+    build:
+      builder: python
+      commands:
+        - pip install -r requirements.txt
+    start:
+      command: python3 main.py
+    env:
+      - API_ID
+      - API_HASH
+      - STRING_SESSION
+      - BOT_TOKEN
+      - MONGO_DB_URI
+      - OWNER_ID
