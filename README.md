@@ -11,12 +11,15 @@ A Telegram Music Bot with assistant user (string session) for joining voice chat
 
 - Plays music in voice chats via assistant user account (string session)  
 - Play, pause, resume, stop, skip, end commands  
+- Playlist management commands  
 - Welcome messages  
 - Multi-language support (English & Hindi)  
 - Maintenance mode toggle  
 - Logger enable/disable  
-- Stats command  
+- Stats command including playlist and user stats  
 - Playback control settings for admins or everyone  
+- User authorization mode with auth commands  
+- Public open-source code for community use and contributions made by CFCBots
 
 ---
 
