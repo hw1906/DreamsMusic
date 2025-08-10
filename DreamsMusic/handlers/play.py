@@ -53,14 +53,34 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
             # Get thumbnail
             thumbnail = yt_utils.download_and_blur_thumbnail(thumbnail_url)
             
-            # Join and play
-            await assistant.join_chat(chat_id)
-            await pytgcalls.join_group_call(
-                chat_id,
-                audio_url,
-                join_as=assistant,
-                stream_type="audio"
-            )
+            # Check if assistant is started
+            if not assistant.is_connected:
+                await process_msg.edit("❌ Assistant client is not connected. Please wait a moment and try again.")
+                return
+                
+            try:
+                # Try joining the chat first
+                await assistant.join_chat(chat_id)
+            except Exception as e:
+                await process_msg.edit(f"❌ Assistant couldn't join the chat: {str(e)}")
+                return
+                
+            try:
+                # Then try joining the voice chat
+                await pytgcalls.join_group_call(
+                    chat_id,
+                    audio_url,
+                    join_as=assistant,
+                    stream_type="audio"
+                )
+            except Exception as e:
+                await process_msg.edit(f"❌ Error joining voice chat: {str(e)}\nMake sure a voice chat is active!")
+                # Try to leave the chat if voice chat join failed
+                try:
+                    await assistant.leave_chat(chat_id)
+                except:
+                    pass
+                return
             
             # Send now playing message
             await process_msg.delete()
