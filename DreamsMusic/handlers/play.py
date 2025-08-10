@@ -53,9 +53,15 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
             # Get thumbnail
             thumbnail = yt_utils.download_and_blur_thumbnail(thumbnail_url)
             
-            # Check if assistant is started
-            if not assistant.is_connected:
-                await process_msg.edit("❌ Assistant client is not connected. Please wait a moment and try again.")
+            # Try to check assistant status
+            try:
+                # Try getting assistant's info to check if it's connected
+                me = await assistant.get_me()
+                if not me:
+                    await process_msg.edit("❌ Assistant is starting up. Please try again in a few seconds.")
+                    return
+            except Exception as e:
+                await process_msg.edit(f"❌ Assistant is not ready: {str(e)}\nPlease wait a moment and try again.")
                 return
                 
             try:
