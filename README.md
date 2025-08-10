@@ -65,3 +65,13 @@ sudo apt install tmux -y
 tmux
 
 python3 main.py
+```
+
+## Special Thanks 🙏
+
+[![CFCBots](https://img.shields.io/badge/CFCBots-%231DA1F2.svg?style=for-the-badge&logo=telegram&logoColor=white&animation=fade)](https://t.me/CFCBots)  
+[![CloseFriendsCommunity](https://img.shields.io/badge/CloseFriendsCommunity-%231DA1F2.svg?style=for-the-badge&logo=telegram&logoColor=white&animation=fade)](https://t.me/CloseFriends/community)
+
+---
+
+*Made with ❤️ and ☕ by DreamsMusic Team*
