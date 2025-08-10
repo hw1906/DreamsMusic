@@ -146,35 +146,27 @@ async def handle_add_song_flow(client, message):
         await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
-def main():
+async def main():
     """Main execution flow"""
     logger.info("Starting DreamsMusic...")
     
     try:
-        # Start clients
-        app.start()
-        logger.info("Bot started")
-        
-        assistant.start()
+        await assistant.start()
         logger.info("Assistant started")
         
-        pytgcalls.start()
+        await pytgcalls.start()
         logger.info("PyTgCalls started")
         
         logger.info("DreamsMusic is running...")
-        idle()  # Block until stopped
+        await idle()
         
-    except KeyboardInterrupt:
-        logger.info("Received KeyboardInterrupt...")
     except Exception as e:
         logger.error(f"Error: {str(e)}")
     finally:
         # Cleanup
         if pytgcalls.is_running:
-            pytgcalls.stop()
-        assistant.stop()
-        app.stop()
-        logger.info("Services stopped")
+            await pytgcalls.stop()
+        await assistant.stop()
 
 if __name__ == "__main__":
-    app.run(main)
+    app.run()
