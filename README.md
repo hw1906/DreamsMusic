@@ -2,6 +2,8 @@
 
 Delivering Superior Music Experience to Telegram.
 
+![Alt text]([https://example.com/path/to/image.png](https://graph.org/file/2255334da15aee384dcb5-c7b55af2c8cb40c4cb.jpg))
+
 ## Commands List
 
 | Command        | Description                                      |
