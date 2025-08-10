@@ -1,10 +1,14 @@
 # handlers/play.py
 
 import asyncio
+import logging
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from DreamsMusic.utils import maintenance_util, logger_util, yt_utils
 from DreamsMusic.core import player
+
+# Set up logging for the play handler
+logger = logging.getLogger("DreamsMusic.play")
 
 # Global dictionary to track control panel message IDs by chat for updating seekbar
 playing_messages = {}
@@ -55,37 +59,72 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
             
             # Try to check assistant status
             try:
+                # Check if assistant is None or not initialized
+                if assistant is None:
+                    logger.error("Assistant client is None")
+                    await process_msg.edit("❌ Assistant is not initialized. Please report this to the bot owner.")
+                    return
+                    
                 # Try getting assistant's info to check if it's connected
+                logger.info(f"Checking assistant status for chat {chat_id}")
                 me = await assistant.get_me()
                 if not me:
+                    logger.warning("Assistant get_me() returned None")
                     await process_msg.edit("❌ Assistant is starting up. Please try again in a few seconds.")
                     return
+                logger.info(f"Assistant is ready: {me.first_name} ({me.id})")
             except Exception as e:
-                await process_msg.edit(f"❌ Assistant is not ready: {str(e)}\nPlease wait a moment and try again.")
+                logger.error(f"Error checking assistant status: {str(e)}")
+                await process_msg.edit(
+                    "❌ Assistant is not ready. Please wait a moment and try again.\n"
+                    "If this persists, the bot might need to be restarted."
+                )
                 return
                 
             try:
                 # Try joining the chat first
+                logger.info(f"Assistant attempting to join chat {chat_id}")
                 await assistant.join_chat(chat_id)
+                logger.info(f"Assistant successfully joined chat {chat_id}")
             except Exception as e:
-                await process_msg.edit(f"❌ Assistant couldn't join the chat: {str(e)}")
+                logger.error(f"Error joining chat {chat_id}: {str(e)}")
+                await process_msg.edit(
+                    "❌ Assistant couldn't join the chat.\n"
+                    "Make sure the assistant isn't banned and has proper permissions."
+                )
                 return
                 
             try:
                 # Then try joining the voice chat
+                logger.info(f"Attempting to join voice chat in {chat_id}")
                 await pytgcalls.join_group_call(
                     chat_id,
                     audio_url,
                     join_as=assistant,
                     stream_type="audio"
                 )
+                logger.info(f"Successfully joined voice chat in {chat_id}")
             except Exception as e:
-                await process_msg.edit(f"❌ Error joining voice chat: {str(e)}\nMake sure a voice chat is active!")
+                logger.error(f"Error joining voice chat in {chat_id}: {str(e)}")
+                error_msg = str(e).lower()
+                if "not found" in error_msg:
+                    await process_msg.edit("❌ No active voice chat found. Please start a voice chat first!")
+                elif "already in" in error_msg:
+                    await process_msg.edit("❌ Assistant is already in this voice chat. Try /stop first!")
+                else:
+                    await process_msg.edit(
+                        "❌ Error joining voice chat.\n"
+                        "Make sure:\n"
+                        "1. A voice chat is active\n"
+                        "2. The bot has permission to join\n"
+                        "3. The assistant isn't already in another voice chat"
+                    )
                 # Try to leave the chat if voice chat join failed
                 try:
+                    logger.info(f"Leaving chat {chat_id} after voice chat join failure")
                     await assistant.leave_chat(chat_id)
-                except:
-                    pass
+                except Exception as cleanup_error:
+                    logger.error(f"Error leaving chat after failed join: {cleanup_error}")
                 return
             
             # Send now playing message
