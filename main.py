@@ -56,9 +56,6 @@ app = Client(
     api_hash=API_HASH,
     bot_token=BOT_TOKEN
 )
-    api_hash=API_HASH,
-    session_string=STRING_SESSION,
-)
 
 pytgcalls = PyTgCalls(assistant)
 
@@ -203,20 +200,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-        # Cleanup
-        logger.info("Shutting down...")
-        tasks = []
-        if 'app' in locals():
-            tasks.append(app.stop())
-        if 'pytgcalls' in locals():
-            tasks.append(pytgcalls.stop())
-        if 'assistant' in locals():
-            tasks.append(assistant.stop())
-        await asyncio.gather(*tasks)
-        # Cleanup
-        if pytgcalls.is_running:
-            await pytgcalls.stop()
-        await assistant.stop()
-
-if __name__ == "__main__":
-    app.run()
