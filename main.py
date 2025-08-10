@@ -148,28 +148,48 @@ async def handle_add_song_flow(client, message):
         await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
-async def shutdown():
-    """Cleanup function to properly stop all clients and tasks"""
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    [task.cancel() for task in tasks]
-    
+async def stop_clients():
+    """Stop all clients in the correct order"""
     logger.info("Stopping clients...")
     try:
         if hasattr(pytgcalls, 'is_running') and pytgcalls.is_running:
             await pytgcalls.stop()
+        
+        # Stop dispatcher first to prevent new handler tasks
+        if hasattr(app, 'dispatcher'):
+            app.dispatcher.stop()
+        if hasattr(assistant, 'dispatcher'):
+            assistant.dispatcher.stop()
+            
+        await asyncio.sleep(1)  # Give handlers time to complete
+        
+        # Then stop the clients
         await app.stop()
         await assistant.stop()
     except Exception as e:
         logger.error(f"Error during client shutdown: {str(e)}")
 
-    logger.info("Waiting for all tasks to complete...")
+async def cleanup_tasks():
+    """Clean up any remaining tasks"""
     try:
-        await asyncio.gather(*tasks, return_exceptions=True)
+        # Cancel all tasks except current
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        if tasks:
+            logger.info(f"Cleaning up {len(tasks)} pending tasks...")
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
     except Exception as e:
         logger.error(f"Error during task cleanup: {str(e)}")
 
+async def shutdown():
+    """Coordinated shutdown of all components"""
+    await stop_clients()
+    await cleanup_tasks()
+
 async def main():
     try:
+        # Initialize clients
         await app.start()
         logger.info("Bot client started.")
 
@@ -184,11 +204,12 @@ async def main():
 
     except Exception as e:
         logger.error(f"Error occurred: {str(e)}")
+        raise  # Re-raise to trigger shutdown
     finally:
         await shutdown()
 
 def run():
-    """Entry point function to handle event loop"""
+    """Entry point with proper event loop handling"""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
@@ -200,12 +221,15 @@ def run():
         logger.error(f"Main loop error: {str(e)}")
     finally:
         try:
-            loop.run_until_complete(shutdown())
+            # Ensure shutdown runs in the same loop
+            if not loop.is_closed():
+                loop.run_until_complete(shutdown())
+                loop.run_until_complete(loop.shutdown_asyncgens())
         except Exception as e:
-            logger.error(f"Shutdown error: {str(e)}")
-        
-        loop.run_until_complete(loop.shutdown_asyncgens())
-        loop.close()
+            logger.error(f"Final cleanup error: {str(e)}")
+        finally:
+            if not loop.is_closed():
+                loop.close()
 
 if __name__ == "__main__":
     run()
