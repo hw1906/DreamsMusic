@@ -148,24 +148,42 @@ async def handle_add_song_flow(client, message):
         await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
-async def start_clients():
-    await app.start()
-    logger.info("Bot client started.")
-
-    await assistant.start()
-    logger.info("Assistant client started.")
-
-    await pytgcalls.start()
-    logger.info("PyTgCalls started on assistant client.")
-
-
 async def main():
-    await start_clients()
-    logger.info("DreamsMusic is running...")
-    await idle()
-    await app.stop()
-    await assistant.stop()
+    try:
+        # Start the clients
+        await app.start()
+        logger.info("Bot client started.")
+
+        await assistant.start()
+        logger.info("Assistant client started.")
+
+        await pytgcalls.start()
+        logger.info("PyTgCalls started on assistant client.")
+
+        logger.info("DreamsMusic is running...")
+        
+        # Wait for termination
+        await idle()
+
+    except Exception as e:
+        logger.error(f"Error occurred: {str(e)}")
+    finally:
+        # Ensure proper cleanup
+        try:
+            if pytgcalls.is_running:
+                await pytgcalls.stop()
+            await app.stop()
+            await assistant.stop()
+        except Exception as e:
+            logger.error(f"Error during cleanup: {str(e)}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.close()
