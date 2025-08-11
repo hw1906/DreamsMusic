@@ -58,7 +58,7 @@ class DreamsMusicBot:
     async def initialize(self):
         """Initialize clients asynchronously"""
         try:
-            # Initialize the assistant first with more options
+            # Initialize the assistant first
             self.assistant = Client(
                 "assistant",
                 api_id=API_ID,
@@ -66,30 +66,21 @@ class DreamsMusicBot:
                 session_string=STRING_SESSION,
                 no_updates=False,
                 in_memory=True,
-                max_concurrent_transmissions=3,
-                retry_delay=1,
                 workers=4
             )
             
-            # Initialize the main bot with more options
+            # Initialize the main bot
             self.app = Client(
                 "DreamsMusicBot",
                 api_id=API_ID,
                 api_hash=API_HASH,
                 bot_token=BOT_TOKEN,
                 in_memory=True,
-                sleep_threshold=5,
-                max_concurrent_transmissions=3,
-                retry_delay=1,
                 workers=4
             )
             
             # Initialize PyTgCalls with the assistant
-            self.pytgcalls = PyTgCalls(
-                self.assistant,
-                cache_duration=100,
-                overload_quiet_mode=True
-            )
+            self.pytgcalls = PyTgCalls(self.assistant)
             
             # Set up PyTgCalls event handlers
             @self.pytgcalls.on_stream_end()
@@ -203,30 +194,12 @@ async def shutdown():
     logger.info("Shutting down...")
     
     try:
-        # Cancel all pending tasks except current
-        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-        if tasks:
-            logger.info(f"Cancelling {len(tasks)} pending tasks...")
-            for task in tasks:
-                task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-            
-        if bot.pytgcalls:
-            # Stop all active calls first
-            logger.info("Stopping active calls...")
-            try:
-                if hasattr(bot.pytgcalls, 'active_calls'):
-                    for chat_id in bot.pytgcalls.active_calls:
-                        try:
-                            await bot.pytgcalls.leave_group_call(chat_id)
-                        except Exception as e:
-                            logger.error(f"Error leaving call in {chat_id}: {str(e)}")
-                logger.info("All active calls stopped!")
-            except Exception as e:
-                logger.error(f"Error stopping calls: {str(e)}")
+        # Get current tasks
+        current_task = asyncio.current_task()
+        tasks = [t for t in asyncio.all_tasks() if t is not current_task]
         
+        # Stop components in order
         if bot.app:
-            # Stop main bot first
             logger.info("Stopping main bot...")
             try:
                 await bot.app.stop()
@@ -234,8 +207,20 @@ async def shutdown():
             except Exception as e:
                 logger.error(f"Error stopping main bot: {str(e)}")
         
+        if bot.pytgcalls:
+            logger.info("Stopping PyTgCalls...")
+            try:
+                if hasattr(bot.pytgcalls, 'leave_group_call'):
+                    for chat_id in getattr(bot.pytgcalls, 'active_calls', []):
+                        try:
+                            await bot.pytgcalls.leave_group_call(chat_id)
+                        except Exception as e:
+                            logger.error(f"Error leaving call in {chat_id}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error stopping PyTgCalls: {str(e)}")
+            logger.info("PyTgCalls stopped!")
+        
         if bot.assistant:
-            # Stop assistant next
             logger.info("Stopping assistant...")
             try:
                 await bot.assistant.stop()
@@ -243,31 +228,19 @@ async def shutdown():
             except Exception as e:
                 logger.error(f"Error stopping assistant: {str(e)}")
         
-        # PyTgCalls cleanup happens automatically with the assistant
+        # Cancel remaining tasks
+        if tasks:
+            logger.info(f"Cancelling {len(tasks)} remaining tasks...")
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+        
         logger.info("Shutdown complete!")
         
     except Exception as e:
         logger.error(f"Error during shutdown: {str(e)}")
     finally:
-        try:
-            # Get event loop but don't create a new one if it doesn't exist
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                return
-            
-            # Cancel any remaining tasks
-            pending = asyncio.all_tasks(loop=loop)
-            for task in pending:
-                task.cancel()
-            
-            # Wait for tasks to cancel
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        except Exception as e:
-            logger.error(f"Error in final cleanup: {str(e)}")
-        finally:
-            sys.exit(0)
+        # Let the main function handle loop cleanup
 
 async def start_bot():
     """Start the bot and its components"""
@@ -345,11 +318,16 @@ async def main():
     """Main execution flow"""
     try:
         if not await start_bot():
+            logger.error("Failed to start bot, exiting...")
             return
+        
+        def signal_handler(signum, frame):
+            loop = asyncio.get_event_loop()
+            loop.create_task(shutdown())
         
         # Set up signal handlers
         for sig in (signal.SIGINT, signal.SIGTERM):
-            signal.signal(sig, lambda s, f: asyncio.create_task(shutdown()))
+            signal.signal(sig, signal_handler)
         
         # Wait for termination
         await idle()
@@ -360,8 +338,26 @@ async def main():
         logger.error(f"Fatal error: {str(e)}")
         raise
     finally:
-        await shutdown()
+        try:
+            await shutdown()
+        except Exception as e:
+            logger.error(f"Error during shutdown: {str(e)}")
 
 if __name__ == "__main__":
-    # Run with proper event loop management
-    asyncio.run(main())
+    try:
+        # Create and set event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Run the main function
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        logger.error(f"Fatal error in main: {str(e)}")
+    finally:
+        try:
+            loop.close()
+        except Exception as e:
+            logger.error(f"Error closing loop: {str(e)}")
+        sys.exit(0)
