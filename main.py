@@ -57,35 +57,53 @@ class DreamsMusicBot:
         
     async def initialize(self):
         """Initialize clients asynchronously"""
-        # Initialize the assistant first
-        self.assistant = Client(
-            "assistant",
-            api_id=API_ID,
-            api_hash=API_HASH,
-            session_string=STRING_SESSION,
-            no_updates=False,
-            in_memory=True
-        )
-        
-        # Initialize the main bot
-        self.app = Client(
-            "DreamsMusicBot",
-            api_id=API_ID,
-            api_hash=API_HASH,
-            bot_token=BOT_TOKEN,
-            in_memory=True
-        )
-        
-        # Initialize PyTgCalls with the assistant
-        self.pytgcalls = PyTgCalls(self.assistant)
-        
-        # Set up PyTgCalls event handlers
-        @self.pytgcalls.on_stream_end()
-        async def on_stream_end(_, update: Update):
-            if isinstance(update, StreamAudioEnded):
-                chat_id = update.chat_id
-                # Handle stream end - you can implement your logic here
-                logger.info(f"Stream ended in chat {chat_id}")
+        try:
+            # Initialize the assistant first with more options
+            self.assistant = Client(
+                "assistant",
+                api_id=API_ID,
+                api_hash=API_HASH,
+                session_string=STRING_SESSION,
+                no_updates=False,
+                in_memory=True,
+                max_concurrent_transmissions=3,
+                retry_delay=1,
+                workers=4
+            )
+            
+            # Initialize the main bot with more options
+            self.app = Client(
+                "DreamsMusicBot",
+                api_id=API_ID,
+                api_hash=API_HASH,
+                bot_token=BOT_TOKEN,
+                in_memory=True,
+                sleep_threshold=5,
+                max_concurrent_transmissions=3,
+                retry_delay=1,
+                workers=4
+            )
+            
+            # Initialize PyTgCalls with the assistant
+            self.pytgcalls = PyTgCalls(
+                self.assistant,
+                cache_duration=100,
+                overload_quiet_mode=True
+            )
+            
+            # Set up PyTgCalls event handlers
+            @self.pytgcalls.on_stream_end()
+            async def on_stream_end(_, update: Update):
+                if isinstance(update, StreamAudioEnded):
+                    chat_id = update.chat_id
+                    logger.info(f"Stream ended in chat {chat_id}")
+                    
+            logger.info("All clients initialized successfully")
+            return True
+                    
+        except Exception as e:
+            logger.error(f"Error initializing clients: {str(e)}")
+            return False
 
 # Create bot instance
 bot = DreamsMusicBot()
@@ -257,32 +275,64 @@ async def start_bot():
     
     try:
         # Initialize all clients first
-        await init_clients()
+        if not await init_clients():
+            logger.error("Failed to initialize clients")
+            return False
         
-        # Start assistant first
+        # Start assistant with retry logic
         logger.info("Starting assistant...")
-        await bot.assistant.start()
-        me_assistant = await bot.assistant.get_me()
-        logger.info(f"Assistant started successfully! Name: {me_assistant.first_name}")
+        retry_count = 0
+        while retry_count < 3:
+            try:
+                await bot.assistant.start()
+                me_assistant = await bot.assistant.get_me()
+                logger.info(f"Assistant started successfully! Name: {me_assistant.first_name}")
+                break
+            except Exception as e:
+                retry_count += 1
+                if retry_count == 3:
+                    logger.error(f"Failed to start assistant after 3 attempts: {str(e)}")
+                    return False
+                logger.warning(f"Assistant start attempt {retry_count} failed, retrying...")
+                await asyncio.sleep(1)
         
-        # Start the main bot
+        # Start the main bot with retry logic
         logger.info("Starting main bot...")
-        await bot.app.start()
-        me_bot = await bot.app.get_me()
-        logger.info(f"Bot started successfully! Name: {me_bot.first_name}")
+        retry_count = 0
+        while retry_count < 3:
+            try:
+                await bot.app.start()
+                me_bot = await bot.app.get_me()
+                logger.info(f"Bot started successfully! Name: {me_bot.first_name}")
+                break
+            except Exception as e:
+                retry_count += 1
+                if retry_count == 3:
+                    logger.error(f"Failed to start main bot after 3 attempts: {str(e)}")
+                    return False
+                logger.warning(f"Main bot start attempt {retry_count} failed, retrying...")
+                await asyncio.sleep(1)
         
-        # Initialize and start PyTgCalls last
+        # Initialize and start PyTgCalls
         logger.info("Starting PyTgCalls...")
-        await bot.pytgcalls.start()
-        logger.info("PyTgCalls started successfully!")
+        try:
+            await bot.pytgcalls.start()
+            logger.info("PyTgCalls started successfully!")
+        except Exception as e:
+            logger.error(f"Failed to start PyTgCalls: {str(e)}")
+            return False
         
         # Make assistant and pytgcalls available to handlers
         bot.app.assistant = bot.assistant
         bot.app.pytgcalls = bot.pytgcalls
         
         # Register all handlers now that clients are initialized
-        logger.info("Registering message handlers...")
-        register_handlers(bot.app)
+        try:
+            logger.info("Registering message handlers...")
+            register_handlers(bot.app)
+        except Exception as e:
+            logger.error(f"Error registering handlers: {str(e)}")
+            return False
         
         logger.info("DreamsMusic is fully operational! 🎵")
         return True
