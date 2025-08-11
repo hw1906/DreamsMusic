@@ -46,14 +46,23 @@ logger.addHandler(file_handler)
 # Initialize clients
 class DreamsMusicBot:
     def __init__(self):
-        self.loop = asyncio.get_event_loop()
+        # Don't create/get loop in __init__
+        self.assistant = None
+        self.app = None
+        self.pytgcalls = None
+        self.maintenance_mode = MAINTENANCE_MODE
+        self.lang = language_util.load_language(DEFAULT_LANG)
+        
+    def initialize(self, loop):
+        """Initialize clients with the provided event loop"""
         self.assistant = Client(
             "assistant",
             api_id=API_ID,
             api_hash=API_HASH,
             session_string=STRING_SESSION,
             no_updates=False,
-            loop=self.loop
+            in_memory=True,
+            loop=loop
         )
         
         self.app = Client(
@@ -61,12 +70,11 @@ class DreamsMusicBot:
             api_id=API_ID,
             api_hash=API_HASH,
             bot_token=BOT_TOKEN,
-            loop=self.loop
+            in_memory=True,
+            loop=loop
         )
         
         self.pytgcalls = PyTgCalls(self.assistant)
-        self.maintenance_mode = MAINTENANCE_MODE
-        self.lang = language_util.load_language(DEFAULT_LANG)
 
 # Create bot instance
 bot = DreamsMusicBot()
@@ -166,47 +174,55 @@ async def handle_add_song_flow(client, message):
 
 
 async def shutdown():
-    """Properly shutdown all clients and tasks"""
-    logger.info("Initiating shutdown sequence...")
+    """Cleanup before shutdown"""
+    logger.info("Shutting down...")
     
     try:
-        # Stop dispatcher first to prevent new updates
-        if hasattr(bot.app, 'dispatcher'):
-            logger.info("Stopping dispatcher...")
-            await bot.app.dispatcher.stop()
-        if hasattr(bot.assistant, 'dispatcher'):
-            await bot.assistant.dispatcher.stop()
-            
-        # Cancel all running tasks except the main task
-        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-        for task in tasks:
-            task.cancel()
-            
-        logger.info(f"Cancelling {len(tasks)} running tasks...")
-        await asyncio.gather(*tasks, return_exceptions=True)
+        # Stop all active calls first
+        logger.info("Stopping active calls...")
+        for chat_id in bot.pytgcalls.active_calls:
+            await bot.pytgcalls.leave_group_call(chat_id)
+        logger.info("All active calls stopped!")
         
-        # Stop clients in reverse order
-        logger.info("Stopping main bot...")
-        if bot.app.is_initialized:
-            await bot.app.stop()
-        
+        # Stop PyTgCalls
         logger.info("Stopping PyTgCalls...")
         await bot.pytgcalls.stop()
+        logger.info("PyTgCalls stopped successfully!")
         
+        # Stop assistant 
         logger.info("Stopping assistant...")
-        if bot.assistant.is_initialized:
-            await bot.assistant.stop()
-            
+        await bot.assistant.stop()
+        logger.info("Assistant stopped successfully!")
+        
+        # Finally stop main bot 
+        logger.info("Stopping main bot...")
+        await bot.app.stop()
+        logger.info("Bot stopped successfully!")
+        
     except Exception as e:
         logger.error(f"Error during shutdown: {str(e)}")
     finally:
-        logger.info("Shutdown complete! ✨")
+        # Get the current event loop and close it
+        try:
+            loop = asyncio.get_event_loop()
+            loop.stop()
+            loop.close()
+        except Exception as e:
+            logger.error(f"Error closing event loop: {str(e)}")
+        sys.exit()
 
-async def main():
-    """Main execution flow"""
+async def start_bot():
+    """Initialize and start the bot with a new event loop"""
     logger.info("Starting DreamsMusic...")
     
+    # Create new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     try:
+        # Initialize clients with the new loop
+        bot.initialize(loop)
+        
         # Start assistant first
         logger.info("Starting assistant...")
         await bot.assistant.start()
@@ -229,16 +245,21 @@ async def main():
         bot.app.pytgcalls = bot.pytgcalls
         
         logger.info("DreamsMusic is fully operational! 🎵")
-        
-        # Handle graceful shutdown on SIGTERM/SIGINT
-        try:
-            await idle()
-        except asyncio.CancelledError:
-            pass
+        return True
         
     except Exception as e:
         logger.error(f"Error starting bot: {str(e)}")
-        raise
+        return False
+
+async def main():
+    """Main execution flow"""
+    if not await start_bot():
+        return
+    
+    try:
+        await idle()
+    except (asyncio.CancelledError, KeyboardInterrupt):
+        pass
     finally:
         await shutdown()
 
