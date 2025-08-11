@@ -240,7 +240,7 @@ async def shutdown():
     except Exception as e:
         logger.error(f"Error during shutdown: {str(e)}")
     finally:
-        # Let the main function handle loop cleanup
+        pass  # Let the main function handle loop cleanup
 
 async def start_bot():
     """Start the bot and its components"""
