@@ -76,25 +76,34 @@ class DreamsMusicBot:
         
         self.pytgcalls = PyTgCalls(self.assistant)
 
-# Create bot instance
+# Create bot instance and initialize clients immediately
 bot = DreamsMusicBot()
+
+# Initialize with default event loop
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+bot.initialize(loop)
+
+# Make instances available at module level after initialization
 assistant = bot.assistant
-app = bot.app
+app = bot.app  # Now app is properly initialized
 pytgcalls = bot.pytgcalls
 maintenance_mode = bot.maintenance_mode
 lang = bot.lang
 
 
 # Register handlers
+def register_handlers():
+    @app.on_message(filters.command("start") & filters.private)
+    async def start_cmd(client, message):
+        await start_handler.start(client, message, lang)
 
-@app.on_message(filters.command("start") & filters.private)
-async def start_cmd(client, message):
-    await start_handler.start(client, message, lang)
+    @app.on_message(filters.command(["pause", "resume", "stop", "skip", "end"]) & filters.user(AUTH_USERS))
+    async def admin_cmd(client, message):
+        await admin_handler.handle_commands(client, message, lang)
 
-
-@app.on_message(filters.command(["pause", "resume", "stop", "skip", "end"]) & filters.user(AUTH_USERS))
-async def admin_cmd(client, message):
-    await admin_handler.handle_commands(client, message, lang)
+# Register handlers after app is initialized
+register_handlers()
 
 
 @app.on_message(filters.command("play"))
@@ -212,17 +221,10 @@ async def shutdown():
         sys.exit()
 
 async def start_bot():
-    """Initialize and start the bot with a new event loop"""
+    """Start the bot and its components"""
     logger.info("Starting DreamsMusic...")
     
-    # Create new event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
     try:
-        # Initialize clients with the new loop
-        bot.initialize(loop)
-        
         # Start assistant first
         logger.info("Starting assistant...")
         await bot.assistant.start()
