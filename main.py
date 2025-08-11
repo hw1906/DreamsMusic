@@ -3,6 +3,7 @@
 
 import logging
 import asyncio
+import signal
 from pyrogram import Client, filters, idle
 from pyrogram.types import CallbackQuery
 from pytgcalls import PyTgCalls
@@ -37,25 +38,43 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize bot and assistant clients
-app = Client(
-    "DreamsMusicBot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN,
-)
+# Add file handler for logging
+file_handler = logging.FileHandler("bot.log")
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
 
-assistant = Client(
-    "assistant",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    session_string=STRING_SESSION,
-)
+# Initialize clients
+class DreamsMusicBot:
+    def __init__(self):
+        self.loop = asyncio.get_event_loop()
+        self.assistant = Client(
+            "assistant",
+            api_id=API_ID,
+            api_hash=API_HASH,
+            session_string=STRING_SESSION,
+            no_updates=False,
+            loop=self.loop
+        )
+        
+        self.app = Client(
+            "DreamsMusicBot",
+            api_id=API_ID,
+            api_hash=API_HASH,
+            bot_token=BOT_TOKEN,
+            loop=self.loop
+        )
+        
+        self.pytgcalls = PyTgCalls(self.assistant)
+        self.maintenance_mode = MAINTENANCE_MODE
+        self.lang = language_util.load_language(DEFAULT_LANG)
 
-pytgcalls = PyTgCalls(assistant)
-
-maintenance_mode = MAINTENANCE_MODE
-lang = language_util.load_language(DEFAULT_LANG)
+# Create bot instance
+bot = DreamsMusicBot()
+assistant = bot.assistant
+app = bot.app
+pytgcalls = bot.pytgcalls
+maintenance_mode = bot.maintenance_mode
+lang = bot.lang
 
 
 # Register handlers
@@ -146,27 +165,98 @@ async def handle_add_song_flow(client, message):
         await message.reply(f"✅ Added **{song_name}** to your playlist.")
 
 
+async def shutdown():
+    """Properly shutdown all clients and tasks"""
+    logger.info("Initiating shutdown sequence...")
+    
+    try:
+        # Stop dispatcher first to prevent new updates
+        if hasattr(bot.app, 'dispatcher'):
+            logger.info("Stopping dispatcher...")
+            await bot.app.dispatcher.stop()
+        if hasattr(bot.assistant, 'dispatcher'):
+            await bot.assistant.dispatcher.stop()
+            
+        # Cancel all running tasks except the main task
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        for task in tasks:
+            task.cancel()
+            
+        logger.info(f"Cancelling {len(tasks)} running tasks...")
+        await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Stop clients in reverse order
+        logger.info("Stopping main bot...")
+        if bot.app.is_initialized:
+            await bot.app.stop()
+        
+        logger.info("Stopping PyTgCalls...")
+        await bot.pytgcalls.stop()
+        
+        logger.info("Stopping assistant...")
+        if bot.assistant.is_initialized:
+            await bot.assistant.stop()
+            
+    except Exception as e:
+        logger.error(f"Error during shutdown: {str(e)}")
+    finally:
+        logger.info("Shutdown complete! ✨")
+
 async def main():
     """Main execution flow"""
     logger.info("Starting DreamsMusic...")
     
     try:
-        await assistant.start()
-        logger.info("Assistant started")
+        # Start assistant first
+        logger.info("Starting assistant...")
+        await bot.assistant.start()
+        me_assistant = await bot.assistant.get_me()
+        logger.info(f"Assistant started successfully! Name: {me_assistant.first_name}")
         
-        await pytgcalls.start()
-        logger.info("PyTgCalls started")
+        # Initialize and start PyTgCalls
+        logger.info("Starting PyTgCalls...")
+        await bot.pytgcalls.start()
+        logger.info("PyTgCalls started successfully!")
         
-        logger.info("DreamsMusic is running...")
-        await idle()
+        # Start the main bot
+        logger.info("Starting main bot...")
+        await bot.app.start()
+        me_bot = await bot.app.get_me()
+        logger.info(f"Bot started successfully! Name: {me_bot.first_name}")
+        
+        # Make assistant and pytgcalls available to handlers
+        bot.app.assistant = bot.assistant
+        bot.app.pytgcalls = bot.pytgcalls
+        
+        logger.info("DreamsMusic is fully operational! 🎵")
+        
+        # Handle graceful shutdown on SIGTERM/SIGINT
+        try:
+            await idle()
+        except asyncio.CancelledError:
+            pass
         
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
+        logger.error(f"Error starting bot: {str(e)}")
+        raise
     finally:
-        # Cleanup
-        if pytgcalls.is_running:
-            await pytgcalls.stop()
-        await assistant.stop()
+        await shutdown()
+
+def signal_handler():
+    """Handle shutdown signals"""
+    loop = asyncio.get_event_loop()
+    loop.create_task(shutdown())
 
 if __name__ == "__main__":
-    app.run()
+    # Set up signal handlers
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, lambda s, f: signal_handler())
+    
+    # Run the bot
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Received shutdown signal...")
+    except Exception as e:
+        logger.error(f"Fatal error: {str(e)}")
+        raise
