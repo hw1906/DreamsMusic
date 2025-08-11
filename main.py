@@ -109,10 +109,14 @@ lang = bot.lang
 async def init_clients():
     """Initialize all clients"""
     global assistant, app, pytgcalls
-    await bot.initialize()
+    success = await bot.initialize()
+    if not success:
+        return False
+        
     assistant = bot.assistant
     app = bot.app
     pytgcalls = bot.pytgcalls
+    return True
 
 
 # All handlers will be registered after client initialization
@@ -194,12 +198,30 @@ async def shutdown():
     logger.info("Shutting down...")
     
     try:
-        # Get current tasks
-        current_task = asyncio.current_task()
-        tasks = [t for t in asyncio.all_tasks() if t is not current_task]
+        # First stop all active calls
+        if bot.pytgcalls:
+            logger.info("Stopping active calls...")
+            try:
+                if hasattr(bot.pytgcalls, 'active_calls'):
+                    calls = list(getattr(bot.pytgcalls, 'active_calls', []))
+                    for chat_id in calls:
+                        try:
+                            await bot.pytgcalls.leave_group_call(chat_id)
+                        except Exception as e:
+                            logger.error(f"Error leaving call in {chat_id}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error stopping calls: {str(e)}")
+            
+            try:
+                # Cleanup PyTgCalls
+                if hasattr(bot.pytgcalls, '_async_core'):
+                    await bot.pytgcalls._async_core.stop()
+            except Exception as e:
+                logger.error(f"Error stopping PyTgCalls core: {str(e)}")
+            logger.info("PyTgCalls cleanup completed")
         
-        # Stop components in order
-        if bot.app:
+        # Stop the main bot
+        if bot.app and not bot.app.is_connected:
             logger.info("Stopping main bot...")
             try:
                 await bot.app.stop()
@@ -207,20 +229,8 @@ async def shutdown():
             except Exception as e:
                 logger.error(f"Error stopping main bot: {str(e)}")
         
-        if bot.pytgcalls:
-            logger.info("Stopping PyTgCalls...")
-            try:
-                if hasattr(bot.pytgcalls, 'leave_group_call'):
-                    for chat_id in getattr(bot.pytgcalls, 'active_calls', []):
-                        try:
-                            await bot.pytgcalls.leave_group_call(chat_id)
-                        except Exception as e:
-                            logger.error(f"Error leaving call in {chat_id}: {str(e)}")
-            except Exception as e:
-                logger.error(f"Error stopping PyTgCalls: {str(e)}")
-            logger.info("PyTgCalls stopped!")
-        
-        if bot.assistant:
+        # Stop the assistant
+        if bot.assistant and not bot.assistant.is_connected:
             logger.info("Stopping assistant...")
             try:
                 await bot.assistant.stop()
@@ -228,11 +238,13 @@ async def shutdown():
             except Exception as e:
                 logger.error(f"Error stopping assistant: {str(e)}")
         
-        # Cancel remaining tasks
+        # Cancel any remaining tasks
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
         if tasks:
             logger.info(f"Cancelling {len(tasks)} remaining tasks...")
             for task in tasks:
-                task.cancel()
+                if not task.done():
+                    task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
         
         logger.info("Shutdown complete!")
@@ -240,7 +252,8 @@ async def shutdown():
     except Exception as e:
         logger.error(f"Error during shutdown: {str(e)}")
     finally:
-        pass  # Let the main function handle loop cleanup
+        # Let the main loop handle final cleanup
+        pass
 
 async def start_bot():
     """Start the bot and its components"""
@@ -345,19 +358,38 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        # Create and set event loop
+        # Create and set event loop with debug enabled
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-        # Run the main function
+        # Enable debug mode
+        loop.set_debug(True)
+        
+        # Run the main function and wait for completion
         loop.run_until_complete(main())
     except KeyboardInterrupt:
-        pass
+        logger.info("Received keyboard interrupt...")
     except Exception as e:
         logger.error(f"Fatal error in main: {str(e)}")
     finally:
         try:
+            # Get all pending tasks
+            pending = asyncio.all_tasks(loop)
+            if pending:
+                # Cancel all pending tasks
+                for task in pending:
+                    task.cancel()
+                # Wait for all tasks to complete with a timeout
+                loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
+            
+            # Clean up the loop
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            loop.run_until_complete(asyncio.sleep(0))  # Flush callbacks
             loop.close()
         except Exception as e:
-            logger.error(f"Error closing loop: {str(e)}")
-        sys.exit(0)
+            logger.error(f"Error during cleanup: {str(e)}")
+        finally:
+            asyncio.set_event_loop(None)
+            sys.exit(0)
