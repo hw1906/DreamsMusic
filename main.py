@@ -201,67 +201,69 @@ async def shutdown():
     logger.info("Shutting down...")
     
     try:
-        # Cancel all pending tasks
-        logger.info("Cancelling pending tasks...")
+        # Cancel all pending tasks except current
         tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-        [task.cancel() for task in tasks]
-        
-        # Wait for task cancellation
-        logger.info(f"Waiting for {len(tasks)} tasks to cancel...")
-        try:
+        if tasks:
+            logger.info(f"Cancelling {len(tasks)} pending tasks...")
+            for task in tasks:
+                task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
-        except asyncio.CancelledError:
-            pass
             
-        # Stop all active calls first
-        logger.info("Stopping active calls...")
-        if hasattr(bot.pytgcalls, 'active_calls'):
-            for chat_id in bot.pytgcalls.active_calls:
-                try:
-                    await bot.pytgcalls.leave_group_call(chat_id)
-                except Exception as e:
-                    logger.error(f"Error leaving call in {chat_id}: {str(e)}")
-        logger.info("All active calls stopped!")
+        if bot.pytgcalls:
+            # Stop all active calls first
+            logger.info("Stopping active calls...")
+            try:
+                if hasattr(bot.pytgcalls, 'active_calls'):
+                    for chat_id in bot.pytgcalls.active_calls:
+                        try:
+                            await bot.pytgcalls.leave_group_call(chat_id)
+                        except Exception as e:
+                            logger.error(f"Error leaving call in {chat_id}: {str(e)}")
+                logger.info("All active calls stopped!")
+            except Exception as e:
+                logger.error(f"Error stopping calls: {str(e)}")
         
-        # Stop PyTgCalls
-        logger.info("Stopping PyTgCalls...")
-        try:
-            await bot.pytgcalls.stop()
-        except Exception as e:
-            logger.error(f"Error stopping PyTgCalls: {str(e)}")
-        logger.info("PyTgCalls stopped successfully!")
+        if bot.app:
+            # Stop main bot first
+            logger.info("Stopping main bot...")
+            try:
+                await bot.app.stop()
+                logger.info("Bot stopped successfully!")
+            except Exception as e:
+                logger.error(f"Error stopping main bot: {str(e)}")
         
-        # Stop assistant 
-        logger.info("Stopping assistant...")
-        try:
-            await bot.assistant.stop()
-        except Exception as e:
-            logger.error(f"Error stopping assistant: {str(e)}")
-        logger.info("Assistant stopped successfully!")
+        if bot.assistant:
+            # Stop assistant next
+            logger.info("Stopping assistant...")
+            try:
+                await bot.assistant.stop()
+                logger.info("Assistant stopped successfully!")
+            except Exception as e:
+                logger.error(f"Error stopping assistant: {str(e)}")
         
-        # Finally stop main bot 
-        logger.info("Stopping main bot...")
-        try:
-            await bot.app.stop()
-        except Exception as e:
-            logger.error(f"Error stopping main bot: {str(e)}")
-        logger.info("Bot stopped successfully!")
+        # PyTgCalls cleanup happens automatically with the assistant
+        logger.info("Shutdown complete!")
         
     except Exception as e:
         logger.error(f"Error during shutdown: {str(e)}")
     finally:
-        # Clean up the event loop
         try:
-            loop = asyncio.get_running_loop()
-            # Close the loop
-            loop.stop()
+            # Get event loop but don't create a new one if it doesn't exist
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                return
+            
+            # Cancel any remaining tasks
             pending = asyncio.all_tasks(loop=loop)
             for task in pending:
                 task.cancel()
-            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-            loop.close()
+            
+            # Wait for tasks to cancel
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
         except Exception as e:
-            logger.error(f"Error cleaning up event loop: {str(e)}")
+            logger.error(f"Error in final cleanup: {str(e)}")
         finally:
             sys.exit(0)
 
