@@ -5,6 +5,8 @@ import logging
 import asyncio
 import signal
 import sys
+import shutil
+import subprocess
 from pyrogram import Client, filters, idle
 from pyrogram.types import CallbackQuery
 from pytgcalls import PyTgCalls
@@ -46,6 +48,31 @@ file_handler = logging.FileHandler("bot.log")
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(file_handler)
 
+def check_nodejs():
+    """Check if Node.js is installed and meets minimum version requirement"""
+    try:
+        # Check if node is available
+        if not shutil.which('node'):
+            logger.error("Node.js not found. Voice calls will be disabled.")
+            return False
+            
+        # Check node version
+        try:
+            version = subprocess.check_output(['node', '--version']).decode().strip()
+            version = version.lstrip('v').split('.')
+            major = int(version[0])
+            if major < 15:
+                logger.error(f"Node.js version {'.'.join(version)} is too old. Minimum required is 15.0.0")
+                return False
+        except (subprocess.CalledProcessError, ValueError, IndexError) as e:
+            logger.error(f"Error checking Node.js version: {str(e)}")
+            return False
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error checking for Node.js: {str(e)}")
+        return False
+
 # Initialize clients
 class DreamsMusicBot:
     def __init__(self):
@@ -79,16 +106,26 @@ class DreamsMusicBot:
                 workers=4
             )
             
-            # Initialize PyTgCalls with the assistant
-            self.pytgcalls = PyTgCalls(self.assistant)
-            
-            # Set up PyTgCalls event handlers
-            @self.pytgcalls.on_stream_end()
-            async def on_stream_end(_, update: Update):
-                if isinstance(update, StreamAudioEnded):
-                    chat_id = update.chat_id
-                    logger.info(f"Stream ended in chat {chat_id}")
+            # Initialize PyTgCalls only if Node.js is available
+            if check_nodejs():
+                try:
+                    self.pytgcalls = PyTgCalls(self.assistant)
                     
+                    # Set up PyTgCalls event handlers
+                    @self.pytgcalls.on_stream_end()
+                    async def on_stream_end(_, update: Update):
+                        if isinstance(update, StreamAudioEnded):
+                            chat_id = update.chat_id
+                            logger.info(f"Stream ended in chat {chat_id}")
+                            
+                    logger.info("PyTgCalls initialized successfully")
+                except Exception as e:
+                    logger.error(f"Failed to initialize PyTgCalls: {str(e)}")
+                    self.pytgcalls = None
+            else:
+                logger.warning("Node.js not available. Voice calls will be disabled.")
+                self.pytgcalls = None
+            
             logger.info("All clients initialized successfully")
             return True
                     
