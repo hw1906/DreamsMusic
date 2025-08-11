@@ -4,9 +4,12 @@
 import logging
 import asyncio
 import signal
+import sys
 from pyrogram import Client, filters, idle
 from pyrogram.types import CallbackQuery
 from pytgcalls import PyTgCalls
+from pytgcalls.types import Update
+from pytgcalls.types.stream import StreamAudioEnded
 
 from config import *
 from DreamsMusic.handlers import (
@@ -46,50 +49,61 @@ logger.addHandler(file_handler)
 # Initialize clients
 class DreamsMusicBot:
     def __init__(self):
-        # Don't create/get loop in __init__
         self.assistant = None
         self.app = None
         self.pytgcalls = None
         self.maintenance_mode = MAINTENANCE_MODE
         self.lang = language_util.load_language(DEFAULT_LANG)
         
-    def initialize(self, loop):
-        """Initialize clients with the provided event loop"""
+    async def initialize(self):
+        """Initialize clients asynchronously"""
+        # Initialize the assistant first
         self.assistant = Client(
             "assistant",
             api_id=API_ID,
             api_hash=API_HASH,
             session_string=STRING_SESSION,
             no_updates=False,
-            in_memory=True,
-            loop=loop
+            in_memory=True
         )
         
+        # Initialize the main bot
         self.app = Client(
             "DreamsMusicBot",
             api_id=API_ID,
             api_hash=API_HASH,
             bot_token=BOT_TOKEN,
-            in_memory=True,
-            loop=loop
+            in_memory=True
         )
         
+        # Initialize PyTgCalls with the assistant
         self.pytgcalls = PyTgCalls(self.assistant)
+        
+        # Set up PyTgCalls event handlers
+        @self.pytgcalls.on_stream_end()
+        async def on_stream_end(_, update: Update):
+            if isinstance(update, StreamAudioEnded):
+                chat_id = update.chat_id
+                # Handle stream end - you can implement your logic here
+                logger.info(f"Stream ended in chat {chat_id}")
 
-# Create bot instance and initialize clients immediately
+# Create bot instance
 bot = DreamsMusicBot()
 
-# Initialize with default event loop
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
-bot.initialize(loop)
-
-# Make instances available at module level after initialization
-assistant = bot.assistant
-app = bot.app  # Now app is properly initialized
-pytgcalls = bot.pytgcalls
+# Make instances available at module level
+assistant = None
+app = None
+pytgcalls = None
 maintenance_mode = bot.maintenance_mode
 lang = bot.lang
+
+async def init_clients():
+    """Initialize all clients"""
+    global assistant, app, pytgcalls
+    await bot.initialize()
+    assistant = bot.assistant
+    app = bot.app
+    pytgcalls = bot.pytgcalls
 
 
 # Register handlers
@@ -256,16 +270,14 @@ async def start_bot():
     logger.info("Starting DreamsMusic...")
     
     try:
+        # Initialize all clients first
+        await init_clients()
+        
         # Start assistant first
         logger.info("Starting assistant...")
         await bot.assistant.start()
         me_assistant = await bot.assistant.get_me()
         logger.info(f"Assistant started successfully! Name: {me_assistant.first_name}")
-        
-        # Initialize and start PyTgCalls
-        logger.info("Starting PyTgCalls...")
-        await bot.pytgcalls.start()
-        logger.info("PyTgCalls started successfully!")
         
         # Start the main bot
         logger.info("Starting main bot...")
@@ -273,9 +285,17 @@ async def start_bot():
         me_bot = await bot.app.get_me()
         logger.info(f"Bot started successfully! Name: {me_bot.first_name}")
         
+        # Initialize and start PyTgCalls last
+        logger.info("Starting PyTgCalls...")
+        await bot.pytgcalls.start()
+        logger.info("PyTgCalls started successfully!")
+        
         # Make assistant and pytgcalls available to handlers
         bot.app.assistant = bot.assistant
         bot.app.pytgcalls = bot.pytgcalls
+        
+        # Register message handlers
+        register_handlers()
         
         logger.info("DreamsMusic is fully operational! 🎵")
         return True
@@ -290,11 +310,11 @@ async def main():
         if not await start_bot():
             return
         
-        # Set up signal handlers within the event loop
-        loop = asyncio.get_running_loop()
+        # Set up signal handlers
         for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown()))
+            signal.signal(sig, lambda s, f: asyncio.create_task(shutdown()))
         
+        # Wait for termination
         await idle()
         
     except (asyncio.CancelledError, KeyboardInterrupt):
@@ -306,11 +326,5 @@ async def main():
         await shutdown()
 
 if __name__ == "__main__":
-    try:
-        # Use asyncio.run which properly manages the event loop
-        asyncio.run(main(), debug=True)
-    except (KeyboardInterrupt, SystemExit):
-        pass  # Shutdown is handled by main()
-    except Exception as e:
-        logger.error(f"Fatal error: {str(e)}")
-        raise
+    # Run with proper event loop management
+    asyncio.run(main())
