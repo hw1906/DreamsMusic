@@ -16,10 +16,11 @@ playing_messages = {}
 MAINTENANCE_IMAGE_URL = "https://i.imgur.com/ZzqV1XY.png"
 LOG_CHANNEL = -1001234567890  # Replace with your actual log channel ID
 
+
 async def play(client, message: Message, lang, pytgcalls, assistant):
     chat_id = message.chat.id
     user_id = message.from_user.id
-    
+
     # Extract query
     query = " ".join(message.text.split()[1:])
     if not query:
@@ -52,21 +53,17 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
             ]
         ])
 
-        # Try to join and play
         try:
             # Get thumbnail
             thumbnail = yt_utils.download_and_blur_thumbnail(thumbnail_url)
-            
-            # Try to check assistant status
+
+            # Assistant check
             try:
-                # Check if assistant is None or not initialized
                 if assistant is None:
                     logger.error("Assistant client is None")
                     await process_msg.edit("❌ Assistant is not initialized. Please report this to the bot owner.")
                     return
-                    
-                # Try getting assistant's info to check if it's connected
-                logger.info(f"Checking assistant status for chat {chat_id}")
+
                 me = await assistant.get_me()
                 if not me:
                     logger.warning("Assistant get_me() returned None")
@@ -80,9 +77,9 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
                     "If this persists, the bot might need to be restarted."
                 )
                 return
-                
+
+            # Ensure assistant is in chat
             try:
-                # Check if assistant is a member of the group
                 assistant_member = None
                 try:
                     assistant_member = await assistant.get_chat_member(chat_id, (await assistant.get_me()).id)
@@ -91,27 +88,21 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
                 if not assistant_member or assistant_member.status == "left":
                     chat = await client.get_chat(chat_id)
                     if chat.username:
-                        # Public group: join by username
                         logger.info(f"Assistant attempting to join public group @{chat.username}")
                         await assistant.join_chat(chat.username)
                         logger.info(f"Assistant successfully joined public group @{chat.username}")
                     else:
-                        # Private group: need invite link
                         bot_member = await client.get_chat_member(chat_id, (await client.get_me()).id)
-                        logger.info(f"Bot member status: {bot_member.status}")
                         if bot_member.status != "administrator":
                             await process_msg.edit(
-                                "❌ Bot needs to be an admin to fetch the invite link and add assistant to private group.\n"
-                                "Please grant admin rights."
+                                "❌ Bot needs to be an admin to fetch the invite link and add assistant to private group."
                             )
                             return
                         try:
                             invite_link = await client.export_chat_invite_link(chat_id)
                         except Exception as e:
                             logger.error(f"Error exporting invite link: {str(e)}")
-                            await process_msg.edit(
-                                "❌ Failed to fetch invite link for private group. Please make sure the bot is an admin and the group allows invite link export."
-                            )
+                            await process_msg.edit("❌ Failed to fetch invite link for private group.")
                             return
                         logger.info(f"Assistant attempting to join private group {chat_id} via invite link")
                         await assistant.join_chat(invite_link)
@@ -120,24 +111,18 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
                     logger.info(f"Assistant already a member of chat {chat_id}")
             except Exception as e:
                 logger.error(f"Error joining chat {chat_id}: {str(e)}")
-                await process_msg.edit(
-                    "❌ Assistant couldn't join the chat.\n"
-                    "Make sure the assistant isn't banned and has proper permissions."
-                )
+                await process_msg.edit("❌ Assistant couldn't join the chat. Make sure it's not banned.")
                 return
-                
+
+            # Join voice chat
             try:
-                # Then try joining the voice chat
                 logger.info(f"Attempting to join voice chat in {chat_id}")
                 from pytgcalls.types.input_stream import InputStream, AudioPiped
-                from pytgcalls.types import StreamType
+
                 await pytgcalls.join_group_call(
                     chat_id,
-                    InputStream(
-                        AudioPiped(audio_url)
-                    ),
-                    join_as=assistant,
-                    stream_type=StreamType().local_stream
+                    InputStream(AudioPiped(audio_url)),
+                    join_as=assistant
                 )
                 logger.info(f"Successfully joined voice chat in {chat_id}")
             except Exception as e:
@@ -155,15 +140,14 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
                         "2. The bot has permission to join\n"
                         "3. The assistant isn't already in another voice chat"
                     )
-                # Try to leave the chat if voice chat join failed
                 try:
                     logger.info(f"Leaving chat {chat_id} after voice chat join failure")
                     await assistant.leave_chat(chat_id)
                 except Exception as cleanup_error:
                     logger.error(f"Error leaving chat after failed join: {cleanup_error}")
                 return
-            
-            # Send now playing message
+
+            # Now playing message
             await process_msg.delete()
             control_message = await message.reply_photo(
                 photo=thumbnail,
@@ -173,14 +157,8 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
                         f"**Requested By:** {message.from_user.mention}",
                 reply_markup=buttons
             )
-
-            # Save message ID for seekbar updates
             playing_messages[chat_id] = control_message.message_id
-
-            # Start background task to update seekbar
             asyncio.create_task(update_seekbar(client, chat_id, duration))
-
-            # Send log if enabled
             await logger_util.send_log(client, LOG_CHANNEL, message.chat, message.from_user, title, duration)
 
         except Exception as e:
@@ -190,6 +168,7 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
     except Exception as e:
         await process_msg.edit(f"❌ Error: {str(e)}")
         return
+
 
 async def update_seekbar(client, chat_id, total_duration):
     current_time = 0
@@ -222,29 +201,28 @@ async def update_seekbar(client, chat_id, total_duration):
         await asyncio.sleep(5)
         current_time += 5
 
+
 @Client.on_callback_query(filters.regex(pattern=r"^(pause|resume|stop|skip|close_panel)_(\d+)"))
 async def handle_player_control(client, callback_query):
     action, chat_id = callback_query.data.split("_")
     chat_id = int(chat_id)
     user_id = callback_query.from_user.id
-    
+
     try:
         if action == "pause":
             await pytgcalls.pause_stream(chat_id)
             await callback_query.answer("⏸ Paused")
-            # Change button to resume
             buttons = callback_query.message.reply_markup.inline_keyboard
             buttons[0][0] = InlineKeyboardButton("▶️", callback_data=f"resume_{chat_id}")
             await callback_query.message.edit_reply_markup(InlineKeyboardMarkup(buttons))
-            
+
         elif action == "resume":
             await pytgcalls.resume_stream(chat_id)
             await callback_query.answer("▶️ Resumed")
-            # Change button back to pause
             buttons = callback_query.message.reply_markup.inline_keyboard
             buttons[0][0] = InlineKeyboardButton("⏸", callback_data=f"pause_{chat_id}")
             await callback_query.message.edit_reply_markup(InlineKeyboardMarkup(buttons))
-            
+
         elif action == "stop":
             await pytgcalls.leave_group_call(chat_id)
             if chat_id in playing_messages:
@@ -254,9 +232,8 @@ async def handle_player_control(client, callback_query):
                     pass
                 playing_messages.pop(chat_id, None)
             await callback_query.answer("⏹ Stopped")
-            
+
         elif action == "skip":
-            # For now just stop since we don't have queue yet
             await pytgcalls.leave_group_call(chat_id)
             if chat_id in playing_messages:
                 try:
@@ -265,7 +242,7 @@ async def handle_player_control(client, callback_query):
                     pass
                 playing_messages.pop(chat_id, None)
             await callback_query.answer("⏭ Skipped")
-            
+
         elif action == "close_panel":
             if chat_id in playing_messages:
                 try:
@@ -274,6 +251,7 @@ async def handle_player_control(client, callback_query):
                     pass
                 playing_messages.pop(chat_id, None)
             await callback_query.answer("❌ Closed")
-            
+
     except Exception as e:
         await callback_query.answer(f"❌ Error: {str(e)}", show_alert=True)
+                
