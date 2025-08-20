@@ -97,11 +97,15 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
             try:
                 # Then try joining the voice chat
                 logger.info(f"Attempting to join voice chat in {chat_id}")
+                from pytgcalls.types.input_stream import InputStream, AudioPiped
+                from pytgcalls.types.stream import StreamType
                 await pytgcalls.join_group_call(
                     chat_id,
-                    audio_url,
+                    InputStream(
+                        AudioPiped(audio_url)
+                    ),
                     join_as=assistant,
-                    stream_type="audio"
+                    stream_type=StreamType().local_stream
                 )
                 logger.info(f"Successfully joined voice chat in {chat_id}")
             except Exception as e:
