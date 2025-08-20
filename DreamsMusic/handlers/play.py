@@ -91,10 +91,10 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
                 if not assistant_member or assistant_member.status == "left":
                     # Fetch invite link
                     bot_member = await client.get_chat_member(chat_id, (await client.get_me()).id)
-                    if not (bot_member.status == "administrator" and bot_member.can_invite_users):
+                    if bot_member.status != "administrator":
                         await process_msg.edit(
-                            "❌ Bot needs to be an admin with invite link permission to add assistant.\n"
-                            "Please grant admin rights with 'Invite Users' permission."
+                            "❌ Bot needs to be an admin to fetch the invite link and add assistant.\n"
+                            "Please grant admin rights."
                         )
                         return
                     # Try to export invite link
@@ -103,7 +103,7 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
                     except Exception as e:
                         logger.error(f"Error exporting invite link: {str(e)}")
                         await process_msg.edit(
-                            f"❌ Failed to fetch invite link: {str(e)}"
+                            "❌ Failed to fetch invite link. Please make sure the bot is an admin and the group allows invite link export."
                         )
                         return
                     # Assistant joins using invite link
