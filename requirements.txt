@@ -7,7 +7,8 @@ httpx[http2]==0.25.2
 motor
 pillow==9.5.0
 psutil
-py-tgcalls==1.2.9
+py-tgcalls==2.2.6
+ntgcalls==1.2.0
 pytgcrypto
 kurigram
 python-dotenv
