@@ -20,6 +20,7 @@ RUN apt-get update && \
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip setuptools wheel
 
 # Copy bot source code
 COPY . .
@@ -30,17 +31,17 @@ ENV PORT=8080
 # Run the bot when container starts
 CMD ["python", "main.py"]FROM python:3.11-slim
 
-WORKDIR /app
+#WORKDIR /app
 
 # Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+#COPY requirements.txt .
+#RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy bot source code
-COPY . .
+#COPY . .
 
 # Set environment variable for port (optional)
-ENV PORT=8080
+#ENV PORT=8080
 
 # Run the bot when container starts
-CMD ["python", "main.py"]
+#CMD ["python", "main.py"]
