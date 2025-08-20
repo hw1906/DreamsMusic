@@ -1,3 +1,4 @@
+
 aiofiles
 aiohttp
 dnspython
@@ -7,7 +8,6 @@ httpx[http2]==0.25.2
 motor
 pillow==9.5.0
 psutil
-py-tgcalls==0.9.7
 pytgcalls==3.0.0.dev6
 pytgcrypto
 kurigram
