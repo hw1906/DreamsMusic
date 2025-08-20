@@ -89,27 +89,32 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
                 except Exception:
                     pass
                 if not assistant_member or assistant_member.status == "left":
-                    # Fetch invite link
-                    bot_member = await client.get_chat_member(chat_id, (await client.get_me()).id)
-                    if bot_member.status != "administrator":
-                        await process_msg.edit(
-                            "❌ Bot needs to be an admin to fetch the invite link and add assistant.\n"
-                            "Please grant admin rights."
-                        )
-                        return
-                    # Try to export invite link
-                    try:
-                        invite_link = await client.export_chat_invite_link(chat_id)
-                    except Exception as e:
-                        logger.error(f"Error exporting invite link: {str(e)}")
-                        await process_msg.edit(
-                            "❌ Failed to fetch invite link. Please make sure the bot is an admin and the group allows invite link export."
-                        )
-                        return
-                    # Assistant joins using invite link
-                    logger.info(f"Assistant attempting to join chat {chat_id} via invite link")
-                    await assistant.join_chat(invite_link)
-                    logger.info(f"Assistant successfully joined chat {chat_id}")
+                    chat = await client.get_chat(chat_id)
+                    if chat.username:
+                        # Public group: join by username
+                        logger.info(f"Assistant attempting to join public group @{chat.username}")
+                        await assistant.join_chat(chat.username)
+                        logger.info(f"Assistant successfully joined public group @{chat.username}")
+                    else:
+                        # Private group: need invite link
+                        bot_member = await client.get_chat_member(chat_id, (await client.get_me()).id)
+                        if bot_member.status != "administrator":
+                            await process_msg.edit(
+                                "❌ Bot needs to be an admin to fetch the invite link and add assistant to private group.\n"
+                                "Please grant admin rights."
+                            )
+                            return
+                        try:
+                            invite_link = await client.export_chat_invite_link(chat_id)
+                        except Exception as e:
+                            logger.error(f"Error exporting invite link: {str(e)}")
+                            await process_msg.edit(
+                                "❌ Failed to fetch invite link for private group. Please make sure the bot is an admin and the group allows invite link export."
+                            )
+                            return
+                        logger.info(f"Assistant attempting to join private group {chat_id} via invite link")
+                        await assistant.join_chat(invite_link)
+                        logger.info(f"Assistant successfully joined private group {chat_id}")
                 else:
                     logger.info(f"Assistant already a member of chat {chat_id}")
             except Exception as e:
