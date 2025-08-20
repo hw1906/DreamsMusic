@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install Node.js (v20.x)
 RUN apt-get update && \
-    apt-get install -y curl git && \
+    apt-get install -y curl git build-essential ffmpeg python3-dev pkg-config && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     apt-get clean
