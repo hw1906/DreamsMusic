@@ -82,10 +82,36 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
                 return
                 
             try:
-                # Try joining the chat first
-                logger.info(f"Assistant attempting to join chat {chat_id}")
-                await assistant.join_chat(chat_id)
-                logger.info(f"Assistant successfully joined chat {chat_id}")
+                # Check if assistant is a member of the group
+                assistant_member = None
+                try:
+                    assistant_member = await assistant.get_chat_member(chat_id, (await assistant.get_me()).id)
+                except Exception:
+                    pass
+                if not assistant_member or assistant_member.status == "left":
+                    # Fetch invite link
+                    bot_member = await client.get_chat_member(chat_id, (await client.get_me()).id)
+                    if not (bot_member.status == "administrator" and bot_member.can_invite_users):
+                        await process_msg.edit(
+                            "❌ Bot needs to be an admin with invite link permission to add assistant.\n"
+                            "Please grant admin rights with 'Invite Users' permission."
+                        )
+                        return
+                    # Try to export invite link
+                    try:
+                        invite_link = await client.export_chat_invite_link(chat_id)
+                    except Exception as e:
+                        logger.error(f"Error exporting invite link: {str(e)}")
+                        await process_msg.edit(
+                            f"❌ Failed to fetch invite link: {str(e)}"
+                        )
+                        return
+                    # Assistant joins using invite link
+                    logger.info(f"Assistant attempting to join chat {chat_id} via invite link")
+                    await assistant.join_chat(invite_link)
+                    logger.info(f"Assistant successfully joined chat {chat_id}")
+                else:
+                    logger.info(f"Assistant already a member of chat {chat_id}")
             except Exception as e:
                 logger.error(f"Error joining chat {chat_id}: {str(e)}")
                 await process_msg.edit(
