@@ -4,10 +4,18 @@ WORKDIR /app
 
 # Install Node.js (v20.x)
 RUN apt-get update && \
-    apt-get install -y curl git build-essential ffmpeg python3-dev pkg-config && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    apt-get clean
+    apt-get install -y \
+        git \
+        curl \
+        build-essential \
+        ffmpeg \
+        libopus-dev \
+        python3-dev \
+        pkg-config \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
