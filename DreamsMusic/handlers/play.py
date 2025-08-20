@@ -98,10 +98,11 @@ async def play(client, message: Message, lang, pytgcalls, assistant):
                     else:
                         # Private group: need invite link
                         bot_member = await client.get_chat_member(chat_id, (await client.get_me()).id)
-                        if bot_member.status != "administrator":
+                        logger.info(f"Bot member status: {bot_member.status}, can_invite_users: {getattr(bot_member, 'can_invite_users', None)}")
+                        if bot_member.status != "administrator" or not getattr(bot_member, "can_invite_users", True):
                             await process_msg.edit(
-                                "❌ Bot needs to be an admin to fetch the invite link and add assistant to private group.\n"
-                                "Please grant admin rights."
+                                "❌ Bot needs to be an admin with 'Invite via Link' permission to fetch the invite link and add assistant to private group.\n"
+                                "Please grant admin rights and enable 'Invite via Link'."
                             )
                             return
                         try:
